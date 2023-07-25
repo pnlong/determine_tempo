@@ -27,4 +27,12 @@ I can use two approaches for this neural network:
 
 ## Software
 
-### *.py*
+### *determine_tempo.py*
+
+Trains a neural network to determine the tempo (in Beats per Minute) of an inputted audio file.
+
+```
+python ./determine_tempo.py
+```
+
+- `var` is the
