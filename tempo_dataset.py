@@ -5,7 +5,7 @@
 # Create a custom audio dataset for PyTorch with torchaudio.
 # Uses songs from my music library
 
-# python ./tempo_dataset.py labels_filepath
+# python ./tempo_dataset.py labels_filepath output_filepath seconds_per_sample
 
 # IMPORTS
 ##################################################
@@ -15,14 +15,14 @@ import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import pandas as pd
-# sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv")
+# sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "10")
 ##################################################
 
 # TEMPO DATASET OBJECT CLASS
 ##################################################
 class tempo_dataset(Dataset):
 
-    def __init__(self, data_filepath, target_sample_rate, n_samples, device, transformation):
+    def __init__(self, data_filepath, target_sample_rate, sample_duration, device, transformation):
 
         # import labelled data file
         self.data = pd.read_csv(data_filepath, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
@@ -32,7 +32,7 @@ class tempo_dataset(Dataset):
 
         # import constants
         self.target_sample_rate = target_sample_rate
-        self.n_samples = n_samples
+        self.n_samples = int(sample_duration * self.target_sample_rate)
         self.device = device
 
         # import torch audio transformation
@@ -90,9 +90,10 @@ class tempo_dataset(Dataset):
 if __name__ == "__main__":
 
     # constants
-    LABELS = sys.argv[1]
-    SAMPLE_RATE = 22050
-    N_SAMPLES = 22050
+    LABELS_FILEPATH = sys.argv[1]
+    OUTPUT_FILEPATH = sys.argv[2]
+    SAMPLE_DURATION = float(sys.argv[3]) # in seconds
+    SAMPLE_RATE = 44100 // 2
 
     # determine what device to run things on
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -100,7 +101,7 @@ if __name__ == "__main__":
 
     mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
 
-    tempo_data = tempo_dataset(data_filepath = LABELS, target_sample_rate = SAMPLE_RATE, n_samples = N_SAMPLES, device = device, transformation = mel_spectrogram)
+    tempo_data = tempo_dataset(data_filepath = LABELS_FILEPATH, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device, transformation = mel_spectrogram)
 
     print(f"There are {len(tempo_data)} samples in the dataset.")
 
