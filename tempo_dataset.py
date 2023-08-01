@@ -5,40 +5,49 @@
 # Create a custom audio dataset for PyTorch with torchaudio.
 # Uses songs from my music library
 
-# python ./tempo_dataset.py
+# python ./tempo_dataset.py labels_filepath
 
-
-
-from os.path import join
+# IMPORTS
+##################################################
+import sys
+from os.path import exists
 import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import pandas as pd
+# sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv")
+##################################################
 
+# TEMPO DATASET OBJECT CLASS
+##################################################
+class tempo_dataset(Dataset):
 
-class UrbanSoundDataset(Dataset):
+    def __init__(self, data_filepath, target_sample_rate, n_samples, device, transformation):
 
-    def __init__(self, annotations_file, audio_dir, target_sample_rate, n_samples, device, transformation):
-        self.annotations = pd.read_csv(annotations_file)
-        self.audio_dir = audio_dir
+        # import labelled data file
+        self.data = pd.read_csv(data_filepath, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
+        self.data = self.data[self.data["path"].apply(lambda path: exists(path))] # remove files that do not exist
+        self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
+        self.data.reset_index(drop = True) # reset indicies
+
+        # import constants
         self.target_sample_rate = target_sample_rate
         self.n_samples = n_samples
         self.device = device
+
+        # import torch audio transformation
         self.transformation = transformation.to(self.device)
 
     def __len__(self):
-        return len(self.annotations)
+        return len(self.data)
 
     def __getitem__(self, index):
-        audio_sample_path = self._get_audio_sample_path(index)
-        label = self._get_audio_sample_label(index)
-
         # get waveform data by loading in audio
-        signal, sr = torchaudio.load(audio_sample_path) # returns the waveform data and sample rate
+        signal, sr = torchaudio.load(self.data.at[index, "path"], format = "mp3") # returns the waveform data and sample rate
 
         # register signal onto device (gpu [cuda] or cpu)
         signal = signal.to(self.device)
-
+ 
         # resample
         signal = self._resample_if_necessary(signal, sample_rate = sr) # resample for consistent sample rate
 
@@ -50,15 +59,8 @@ class UrbanSoundDataset(Dataset):
 
         # apply transformations
         signal = self.transformation(signal) # convert waveform to melspectrogram
-        return signal, label
 
-    def _get_audio_sample_path(self, index): # determine filepath for the audio file at a given index
-        fold = "fold" + str(self.annotations.at[index, "fold"])
-        path = join(self.audio_dir, fold, self.annotations.at[index, "slice_file_name"])
-        return path
-
-    def _get_audio_sample_label(self, index): # get target (label) for a given index
-        return self.annotations.at[index, "classID"]
+        return signal, self.data.at[index, "tempo"] # returns the transformed signal and the actual BPM
 
     def _resample_if_necessary(self, signal, sample_rate): # resample
         if sample_rate != self.target_sample_rate:
@@ -79,12 +81,16 @@ class UrbanSoundDataset(Dataset):
             signal = torch.nn.functional.pad(signal, pad = last_dim_padding, value = 0)
         return signal
 
+##################################################
 
+# TEST IF DATASET OBJECT WORKS
+##################################################
+# if __name__ == "__main__" only runs the code inside the if statement when the program is run directly by the Python interpreter.
+# The code inside the if statement is not executed when the file's code is imported as a module.
 if __name__ == "__main__":
 
     # constants
-    ANNOTATIONS_FILE = "/Volumes/Seagate/UrbanSound8K/metadata/UrbanSound8K.csv"
-    AUDIO_DIR = "/Volumes/Seagate/UrbanSound8K/audio"
+    LABELS = sys.argv[1]
     SAMPLE_RATE = 22050
     N_SAMPLES = 22050
 
@@ -94,14 +100,9 @@ if __name__ == "__main__":
 
     mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
 
-    usd = UrbanSoundDataset(annotations_file = ANNOTATIONS_FILE,
-                            audio_dir = AUDIO_DIR,
-                            target_sample_rate = SAMPLE_RATE,
-                            n_samples = N_SAMPLES,
-                            device = device,
-                            transformation = mel_spectrogram
-                            )
+    tempo_data = tempo_dataset(data_filepath = LABELS, target_sample_rate = SAMPLE_RATE, n_samples = N_SAMPLES, device = device, transformation = mel_spectrogram)
 
-    print(f"There are {len(usd)} samples in the dataset.")
+    print(f"There are {len(tempo_data)} samples in the dataset.")
 
-    signal, label = usd[0]
+    signal, label = tempo_data[0]
+##################################################
