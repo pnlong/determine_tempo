@@ -99,6 +99,7 @@ if __name__ == "__main__":
     # make sure user wants to proceed
     wants_to_proceed = input("Are you sure that you want to create a new tempo dataset? [y/N]: ").lower()
     if wants_to_proceed != "y":
+        print("Quitting program...")
         sys.exit()
     del wants_to_proceed
 
