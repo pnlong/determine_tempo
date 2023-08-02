@@ -140,7 +140,7 @@ if __name__ == "__main__":
     
     # loop through songs and create .wav files
     origin_filepaths, output_filepaths, tempos = [], [], []
-    for i in tqdm(data.index):
+    for i in tqdm(data.index, desc = "Chopping up songs into WAV files"):
 
         # preprocess audio
         signal, sample_rate = torchaudio.load(data.at[i, "path"], format = "mp3") # load in the audio file
