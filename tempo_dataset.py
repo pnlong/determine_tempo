@@ -14,11 +14,12 @@ import sys
 from os.path import exists, join, dirname
 from os import makedirs, remove
 from glob import glob
+from time import sleep as wait
+from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import pandas as pd
-from tqdm import tqdm
 # sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Volumes/Seagate/artificial_dj_data/tempo_data", "10")
 ##################################################
 
@@ -171,6 +172,9 @@ if __name__ == "__main__":
             origin_filepaths.append(data.at[i, "path"]) # add original filepath to origin_filepaths
             output_filepaths.append(path) # add filepath to output_filepaths
             tempos.append(data.at[i, "tempo"]) # add tempo to tempos
+        
+        # add some wait time buffer so ffmpeg doesn't overload
+        wait(0.5)
 
     # write to OUTPUT_FILEPATH
     data = data.rename(columns = {"path": "path_origin"}).drop(columns = ["tempo"]) # rename path column in the original dataframe
