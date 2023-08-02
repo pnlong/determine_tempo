@@ -11,8 +11,9 @@
 # IMPORTS
 ##################################################
 import sys
-from os.path import exists, join
-from os import makedirs
+from os.path import exists, join, dirname
+from os import makedirs, remove
+from glob import glob
 import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
@@ -95,9 +96,20 @@ if __name__ == "__main__":
 
     # CREATE AND PREPROCESS WAV FILE CHOPS FROM FULL SONGS
     ##################################################
-    # create audio output directory if it is not yet created
+    # make sure user wants to proceed
+    wants_to_proceed = input("Are you sure that you want to create a new tempo dataset? [y/N]: ").lower()
+    if wants_to_proceed != "y":
+        sys.exit()
+    del wants_to_proceed
+
+    # create audio output directory and clear it
     if not exists(AUDIO_DIR): 
         makedirs(AUDIO_DIR)
+    for filepath in glob(join(AUDIO_DIR, "*")): # clear AUDIO_DIR
+        remove(filepath)
+    # create output_filepath if not yet created
+    if not exists(dirname(OUTPUT_FILEPATH)):
+        makedirs(dirname(OUTPUT_FILEPATH))    
     
     # determine what device to run things on
     device = "cuda" if torch.cuda.is_available() else "cpu"
