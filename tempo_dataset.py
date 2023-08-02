@@ -147,7 +147,7 @@ if __name__ == "__main__":
         threshold = max(is_silence) * 1e-4 # determine a threshold, ADJUST THIS VALUE TO ADJUST THE CUTOFF THRESHOLD
         is_silence = [x < threshold for x in is_silence] # determine which windows are below the threshold
         start_frame = starting_frames[is_silence.index(False)] if sum(is_silence) != len(is_silence) else 0 # get starting frame of audible audio
-        end_frame = starting_frames[len(is_silence) - is_silence[::-1].index(False)] if sum(is_silence) != len(is_silence) else 0 # get ending from of audible audio
+        end_frame = starting_frames[len(is_silence) - is_silence[::-1].index(False) - 1] if sum(is_silence) != len(is_silence) else 0 # get ending from of audible audio
         return start_frame, end_frame
     
     # loop through songs and create .wav files
