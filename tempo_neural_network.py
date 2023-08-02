@@ -8,11 +8,19 @@
 # python ./tempo_neural_network.py
 
 
+# IMPORTS
+##################################################
 import torch
 from torch import nn
 from torchsummary import summary
+from torch.utils.data import DataLoader
+import torchaudio
+from determine_tempo.tempo_dataset import tempo_dataset # dataset class
+##################################################
 
 
+# NEURAL NETWORK CLASS
+##################################################
 class CNNNetwork(nn.Module):
 
     def __init__(self):
@@ -55,9 +63,19 @@ class CNNNetwork(nn.Module):
         logits = self.linear(x)
         # predictions = self.softmax(logits)
         return logits
-
+##################################################
 
 if __name__ == "__main__":
+
+    # constants
+    BATCH_SIZE = 128
+    EPOCHS = 10
+    LEARNING_RATE = 0.001
+    ANNOTATIONS_FILE = "/Volumes/Seagate/UrbanSound8K/metadata/UrbanSound8K.csv"
+    AUDIO_DIR = "/Volumes/Seagate/UrbanSound8K/audio"
+    SAMPLE_RATE = 22050
+    N_SAMPLES = 22050
+    
 
     # determine device
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -67,31 +85,6 @@ if __name__ == "__main__":
     cnn = CNNNetwork().to(device)
     summary(model = cnn, input_size = (1, 64, 44)) # input_size = (# of channels, # of mels [frequency axis], time axis)
 
-
-
-
-
-
-
-
-
-
-import torch
-from torch import nn
-from torch.utils.data import DataLoader
-import torchaudio
-
-from urbansounddataset import UrbanSoundDataset # import dataset class
-from cnn import CNNNetwork # import convolution neural network Network class
-
-# constants
-BATCH_SIZE = 128
-EPOCHS = 10
-LEARNING_RATE = 0.001
-ANNOTATIONS_FILE = "/Volumes/Seagate/UrbanSound8K/metadata/UrbanSound8K.csv"
-AUDIO_DIR = "/Volumes/Seagate/UrbanSound8K/audio"
-SAMPLE_RATE = 22050
-N_SAMPLES = 22050
 
 
 def create_data_loader(train_data, batch_size):
