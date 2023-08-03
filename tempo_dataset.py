@@ -11,9 +11,10 @@
 # IMPORTS
 ##################################################
 import sys
-from os.path import exists, join, dirname
+from os.path import exists, join, dirname, basename
 from os import makedirs, remove
 from glob import glob
+from natsort import natsorted
 from time import sleep as wait
 from tqdm import tqdm
 import torch
@@ -142,21 +143,27 @@ if __name__ == "__main__":
     # CREATE AND PREPROCESS WAV FILE CHOPS FROM FULL SONGS
     ##################################################
 
+    # create audio output directory and output_filepath
+    if not exists(AUDIO_DIR): 
+        makedirs(AUDIO_DIR)
+    if not exists(dirname(OUTPUT_FILEPATH)):
+        makedirs(dirname(OUTPUT_FILEPATH))   
+
     # make sure user wants to proceed
-    wants_to_proceed = input("Are you sure that you want to create a new tempo dataset? [y/N]: ").lower()
-    if wants_to_proceed != "y":
+    wants_to_proceed = input("Are you sure that you want to create a new tempo dataset? If yes, an entirely new dataset will be created. If no, the program will (try) to continue where it left off. [y/n]: ").lower()
+    if wants_to_proceed == "y": # if yes, clear AUDIO_DIR and start anew
+        for filepath in glob(join(AUDIO_DIR, "*")): # clear AUDIO_DIR
+            remove(filepath)
+        start_index = 0
+    elif wants_to_proceed == "n": # if no, continue where the program left off
+        filepaths = natsorted(glob(join(AUDIO_DIR, "*")))
+        start_index = int(basename(filepaths[len(filepaths) - 1]).split("_")[0])
+        for filepath in filepaths[filepaths.index(join(AUDIO_DIR, f"{start_index}_0.wav")):]: ## clear files from AUDIO_DIR that start with the start index or higher (for some reason!?)
+            remove(filepath)
+    else: # if the answer wasn't yes or no
         print("Quitting program...")
         sys.exit()
     del wants_to_proceed
-
-    # create audio output directory and clear it
-    if not exists(AUDIO_DIR): 
-        makedirs(AUDIO_DIR)
-    for filepath in glob(join(AUDIO_DIR, "*")): # clear AUDIO_DIR
-        remove(filepath)
-    # create output_filepath if not yet created
-    if not exists(dirname(OUTPUT_FILEPATH)):
-        makedirs(dirname(OUTPUT_FILEPATH))    
     
     # determine what device to run things on
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -170,7 +177,7 @@ if __name__ == "__main__":
     
     # loop through songs and create .wav files
     origin_filepaths, output_filepaths, tempos = [], [], []
-    for i in tqdm(data.index, desc = "Chopping up songs into WAV files", mininterval = 0.5):
+    for i in tqdm(data.index[start_index:], desc = "Chopping up songs into WAV files", mininterval = 0.5): # start from start index
 
         # preprocess audio
         signal, sample_rate = torchaudio.load(data.at[i, "path"], format = "mp3") # load in the audio file
