@@ -48,7 +48,7 @@ tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
 N_PREDICTIONS = len(tempo_data) if len(tempo_data) < N_PREDICTIONS else N_PREDICTIONS
 inputs_targets = [tempo_data[i] for i in range(N_PREDICTIONS)]
 inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
-targets = [input_target[1] for input_target in inputs_targets]
+targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0)
 del inputs_targets
 
 # make an inference
@@ -56,13 +56,13 @@ print("Making predictions.")
 print("********************")
 tempo_nn.eval()
 with torch.no_grad():
-    predictions = torch.flatten(input = tempo_nn(inputs))
+    predictions = tempo_nn(inputs)
 
 # print results
 for i in range(N_PREDICTIONS):
-    print(f"Case {i + 1}: Predicted = {predictions[i]:.5f}, Expected = {targets[i]:.5f}, % Difference = {100 * abs(predictions[i] - targets[i]) / targets[i]:.2f}%")
+    print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {(100 * abs(predictions[i] - targets[i]) / targets[i]).item():.2f}%")
 print("********************")
-mse = sum((predictions[i] - targets[i])**2 for i in range(N_PREDICTIONS)) / N_PREDICTIONS
-print(f"Mean Squared Error: {(100 * mse):.2f}")
+error = torch.mean(input = torch.abs(input = predictions - targets)).item()
+print(f"Average Error: {error:.2f}")
 
 ##################################################
