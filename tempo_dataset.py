@@ -37,13 +37,18 @@ STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between each .w
 
 class tempo_dataset(Dataset):
 
-    def __init__(self, labels_filepath, target_sample_rate, sample_duration, device, transformation):
+    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, transformation):
+        # set_type can take on one of three values: ("train", "validation", "test")
 
         # import labelled data file, preprocess
         # it is assumed that the data are mono wav files
         self.data = pd.read_csv(labels_filepath, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
         self.data = self.data[self.data["path"].apply(lambda path: exists(path))] # remove files that do not exist
         self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
+
+        # partition into the train, validation, or test dataset
+        set_types = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0}
+        self.data = self.data.sample(frac = set_types["" if set_type not in set_types.keys() else set_type], replace = False, random_state = 1, ignore_index = True)
         self.data.reset_index(drop = True) # reset indicies
 
         # import constants
@@ -195,7 +200,7 @@ if __name__ == "__main__":
     # most of the information in tempo_data is merely to help me locate a file if it causes problem; in an ideal world, I should be able to ignore it
     print(f"\nWriting output to {OUTPUT_FILEPATH}.")
     tempo_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
-    
+
     ##################################################
 
 
@@ -206,7 +211,7 @@ if __name__ == "__main__":
     mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
 
     # instantiate tempo dataset
-    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device, transformation = mel_spectrogram)
+    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device, transformation = mel_spectrogram)
 
     # test len() functionality
     print(f"There are {len(tempo_data)} samples in the dataset.")

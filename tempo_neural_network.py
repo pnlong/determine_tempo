@@ -5,7 +5,7 @@
 # Creates and trains a linear regression neural network in PyTorch.
 # Given an audio file as input, it outputs a single number representing the song's tempo in Beats per Minute (BPM).
 
-# python ./tempo_neural_network.py labels_filepath output_filepath
+# python ./tempo_neural_network.py labels_filepath nn_filepath
 
 
 # IMPORTS
@@ -36,7 +36,7 @@ class tempo_nn(nn.Module):
 
     def __init__(self):
         super().__init__()
-        # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear -> softmax
+        # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2),
             nn.ReLU(),
@@ -58,12 +58,9 @@ class tempo_nn(nn.Module):
             nn.MaxPool2d(kernel_size = 2)
         )
         self.flatten = nn.Flatten(start_dim = 1)
-        self.linear = nn.Linear(in_features = 128 * 5 * 4, out_features = 10) # out_features = # of classes in UrbanSound8K dataset
-        # self.softmax = nn.Softmax(dim = 1)
-        # Just a note (per PyTorch docs)... when using nn.CrossEntropyLoss() as the loss_fn, it is important to keep the model output as raw logits
-        # (ie. do not include the softmax() in the model as the final output layer).
-        # I read in a discussion that this is important to reduce the potential for numerical instabilities due to some log-sum-exp equation that is performed.
-        # This might be new to the current version of PyTorch (2.0.1).
+        self.linear1 = nn.Linear(in_features = 17920, out_features = 100)
+        self.linear2 = nn.Linear(in_features = 100, out_features = 10)
+        self.output = nn.Linear(in_features = 10, out_features = 1)
 
     def forward(self, input_data):
         x = self.conv1(input_data)
@@ -71,9 +68,10 @@ class tempo_nn(nn.Module):
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.flatten(x)
-        logits = self.linear(x)
-        # predictions = self.softmax(logits)
-        return logits
+        x = self.linear1(x)
+        x = self.linear2(x)
+        output = self.output(x)
+        return output
 
 ##################################################
 
@@ -83,11 +81,14 @@ class tempo_nn(nn.Module):
 # train the whole model
 def train(model, data_loader, loss_function, optimizer, device, epochs):
 
-    for _ in tqdm(range(epochs), desc = "Training Neural Network", mininterval = 5): # epoch for loop
+    for epoch in range(epochs): # epoch for loop
+
+        loss_per_epoch = 0
+
         # train an epoch
         for inputs, labels in data_loader:
             # register inputs and labels with device
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels.type(torch.float).unsqueeze(dim = -1).to(device)
 
             # calculate loss
             predictions = model(inputs)
@@ -97,6 +98,12 @@ def train(model, data_loader, loss_function, optimizer, device, epochs):
             optimizer.zero_grad() # zero the gradients
             loss.backward() # conduct backpropagation
             optimizer.step() # update parameters
+            loss_per_epoch += loss.item()
+
+        # print out updates
+        print(f"EPOCH {epoch + 1}")
+        print(f"Loss: {loss_per_epoch:.5f}")
+        print("********************")
 
 ##################################################
 
@@ -106,7 +113,7 @@ if __name__ == "__main__":
     # CONSTANTS
     ##################################################
     LABELS_FILEPATH = sys.argv[1]
-    OUTPUT_FILEPATH = sys.argv[2]
+    NN_FILEPATH = sys.argv[2]
     ##################################################
 
     # TRAIN NEURAL NETWORK
@@ -118,6 +125,7 @@ if __name__ == "__main__":
     
     # instantiate our dataset object
     tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
+                               set_type = "train",
                                target_sample_rate = SAMPLE_RATE,
                                sample_duration = SAMPLE_DURATION,
                                device = device,
@@ -133,7 +141,7 @@ if __name__ == "__main__":
 
     # instantiate data loader, loss function, and optimizer
     data_loader = DataLoader(tempo_data, batch_size = BATCH_SIZE)
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.MSELoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more)
     optimizer = torch.optim.Adam(tempo_nn.parameters(), lr = LEARNING_RATE)
 
     # train
@@ -141,6 +149,7 @@ if __name__ == "__main__":
     print("Training is done.")
 
     # store trained model
-    torch.save(tempo_nn.state_dict(), OUTPUT_FILEPATH)
-    print(f"Model trained and stored at {OUTPUT_FILEPATH}.")
+    torch.save(tempo_nn.state_dict(), NN_FILEPATH)
+    print(f"Model trained and stored at {NN_FILEPATH}.")
+    
     ##################################################
