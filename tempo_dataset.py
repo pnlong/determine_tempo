@@ -143,29 +143,15 @@ if __name__ == "__main__":
     # CREATE AND PREPROCESS WAV FILE CHOPS FROM FULL SONGS
     ##################################################
 
-    # make sure user wants to proceed
-    wants_to_proceed = input("Are you sure that you want to create a new tempo dataset? If yes, an entirely new dataset will be created. If no, the program will (try) to continue where it left off. [y/n]: ").lower()
-    if wants_to_proceed not in ("y", "n"):
-        print("Quitting program...")
-        sys.exit()
-
     # create audio output directory and output_filepath
     if not exists(AUDIO_DIR): 
         makedirs(AUDIO_DIR)
     if not exists(dirname(OUTPUT_FILEPATH)):
         makedirs(dirname(OUTPUT_FILEPATH))   
 
-    # deal with AUDIO_DIR and where to start
-    filepaths = natsorted(glob(join(AUDIO_DIR, "*")))
-    if wants_to_proceed == "y" or len(filepaths) == 0: # if yes, clear AUDIO_DIR and start anew
-        for filepath in filepaths: # clear AUDIO_DIR if needed
-            remove(filepath)
-        start_index = 0
-    elif wants_to_proceed == "n": # if no, continue where the program left off
-        start_index = int(basename(filepaths[len(filepaths) - 1]).split("_")[0])
-        for filepath in filepaths[filepaths.index(join(AUDIO_DIR, f"{start_index}_0.wav")):]: ## clear files from AUDIO_DIR that start with the start index or higher (for some reason!?)
-            remove(filepath)
-    del filepaths, wants_to_proceed
+    # clear AUDIO_DIR
+    for filepath in glob(join(AUDIO_DIR, "*")):
+        remove(filepath)
     
     # determine what device to run things on
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -178,9 +164,8 @@ if __name__ == "__main__":
     data = data.reset_index(drop = True) # reset indicies
     
     # loop through songs and create .wav files
-    print(f"Starting at song index {start_index}.")
     origin_filepaths, output_filepaths, tempos = [], [], []
-    for i in tqdm(data.index[start_index:], desc = "Chopping up songs into WAV files"): # start from start index
+    for i in tqdm(data.index, desc = "Chopping up songs into WAV files"): # start from start index
 
         # preprocess audio
         try: # try to import the file
