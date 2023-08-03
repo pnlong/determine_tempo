@@ -183,7 +183,10 @@ if __name__ == "__main__":
     for i in tqdm(data.index[start_index:], desc = "Chopping up songs into WAV files", mininterval = 0.5): # start from start index
 
         # preprocess audio
-        signal, sample_rate = torchaudio.load(data.at[i, "path"], format = "mp3") # load in the audio file
+        try: # try to import the file
+            signal, sample_rate = torchaudio.load(data.at[i, "path"], format = "mp3") # load in the audio file
+        except RuntimeError:
+            continue
         signal = signal.to(device) # register signal onto device (gpu [cuda] or cpu)
         signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = SAMPLE_RATE, device = device) # resample for consistent sample rate
         signal = _mix_down_if_necessary(signal = signal) # if there are multiple channels, convert from stereo to mono
