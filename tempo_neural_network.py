@@ -5,23 +5,34 @@
 # Creates and trains a linear regression neural network in PyTorch.
 # Given an audio file as input, it outputs a single number representing the song's tempo in Beats per Minute (BPM).
 
-# python ./tempo_neural_network.py
+# python ./tempo_neural_network.py labels_filepath output_filepath
 
 
 # IMPORTS
 ##################################################
+import sys
+from tqdm import tqdm
 import torch
 from torch import nn
 from torchsummary import summary
 from torch.utils.data import DataLoader
 import torchaudio
-from determine_tempo.tempo_dataset import tempo_dataset # dataset class
+from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION # dataset class + some constants
+# sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
+##################################################
+
+
+# CONSTANTS
+##################################################
+BATCH_SIZE = 128
+EPOCHS = 10
+LEARNING_RATE = 1e-3
 ##################################################
 
 
 # NEURAL NETWORK CLASS
 ##################################################
-class CNNNetwork(nn.Module):
+class tempo_nn(nn.Module):
 
     def __init__(self):
         super().__init__()
@@ -63,90 +74,73 @@ class CNNNetwork(nn.Module):
         logits = self.linear(x)
         # predictions = self.softmax(logits)
         return logits
+
 ##################################################
+
+
+# MODEL TRAINING FUNCTION
+##################################################
+# train the whole model
+def train(model, data_loader, loss_function, optimizer, device, epochs):
+
+    for _ in tqdm(range(epochs), desc = "Training Neural Network", mininterval = 5): # epoch for loop
+        # train an epoch
+        for inputs, labels in data_loader:
+            # register inputs and labels with device
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            # calculate loss
+            predictions = model(inputs)
+            loss = loss_function(predictions, labels)
+
+            # backpropagate loss and update weights
+            optimizer.zero_grad() # zero the gradients
+            loss.backward() # conduct backpropagation
+            optimizer.step() # update parameters
+
+##################################################
+
 
 if __name__ == "__main__":
 
-    # constants
-    BATCH_SIZE = 128
-    EPOCHS = 10
-    LEARNING_RATE = 0.001
-    ANNOTATIONS_FILE = "/Volumes/Seagate/UrbanSound8K/metadata/UrbanSound8K.csv"
-    AUDIO_DIR = "/Volumes/Seagate/UrbanSound8K/audio"
-    SAMPLE_RATE = 22050
-    N_SAMPLES = 22050
-    
+    # CONSTANTS
+    ##################################################
+    LABELS_FILEPATH = sys.argv[1]
+    OUTPUT_FILEPATH = sys.argv[2]
+    ##################################################
+
+    # TRAIN NEURAL NETWORK
+    ##################################################
 
     # determine device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using {device} device.")
-
-    # summarize 
-    cnn = CNNNetwork().to(device)
-    summary(model = cnn, input_size = (1, 64, 44)) # input_size = (# of channels, # of mels [frequency axis], time axis)
-
-
-
-def create_data_loader(train_data, batch_size):
-    train_dataloader = DataLoader(train_data, batch_size = batch_size)
-    return train_dataloader
-
-
-def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
-    for inputs, targets in data_loader:
-        inputs, targets = inputs.to(device), targets.to(device)
-
-        # calculate loss
-        predictions = model(inputs)
-        loss = loss_fn(predictions, targets)
-
-        # backpropagate loss and update weights
-        optimizer.zero_grad() # zero the gradients
-        loss.backward() # conduct backpropagation
-        optimizer.step() # update parameters
     
-    print(f"Loss: {loss.item()}")
+    # instantiate our dataset object
+    tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
+                               target_sample_rate = SAMPLE_RATE,
+                               sample_duration = SAMPLE_DURATION,
+                               device = device,
+                               transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
+                               )
 
+    # construct model and assign it to device, also summarize 
+    print("********************")
+    print("Summary of Neural Network:")
+    tempo_nn = tempo_nn().to(device)
+    summary(model = tempo_nn, input_size = tempo_data[0][0].shape) # input_size = (# of channels, # of mels [frequency axis], time axis)
+    print("********************")
 
-def train(model, data_loader, loss_fn, optimizer, device, epochs):
-    for i in range(epochs):
-        print(f"Epoch {i + 1}")
-        train_one_epoch(model, data_loader, loss_fn, optimizer, device)
-        print("********************")
-    
-    print("Training is done.")
-
-
-if __name__ == "__main__":
-    print("Starting program.")    
-
-    # determine what device we are using
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using {device} device.")
-    
-    # instantiate our dataset object and create data loader
-    mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64) # instantiate melspectrogram transformation
-    usd = UrbanSoundDataset(annotations_file = ANNOTATIONS_FILE,
-                            audio_dir = AUDIO_DIR,
-                            target_sample_rate = SAMPLE_RATE,
-                            n_samples = N_SAMPLES,
-                            device = device,
-                            transformation = mel_spectrogram)
-    train_dataloader = create_data_loader(train_data = usd, batch_size = BATCH_SIZE)
-
-    # construct model and assign it to device
-    cnn = CNNNetwork().to(device)
-    print(cnn)
-
-    # instantiate loss function and optimizer
-    loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(cnn.parameters(), lr = LEARNING_RATE)
+    # instantiate data loader, loss function, and optimizer
+    data_loader = DataLoader(tempo_data, batch_size = BATCH_SIZE)
+    loss_function = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(tempo_nn.parameters(), lr = LEARNING_RATE)
 
     # train
-    print("********************")
-    train(model = cnn, data_loader = train_dataloader, loss_fn = loss_fn, optimizer = optimizer, device = device, epochs = EPOCHS)
+    train(model = tempo_nn, data_loader = data_loader, loss_function = loss_function, optimizer = optimizer, device = device, epochs = EPOCHS)
+    print("Training is done.")
 
     # store trained model
-    output_filepath = "/Users/philliplong/Desktop/Coding/mcauley_lab_prep/audio_processing_pytorch/data/cnn.pth"
-    torch.save(cnn.state_dict(), output_filepath)
-    print(f"Model trained and stored at {output_filepath}.")
+    torch.save(tempo_nn.state_dict(), OUTPUT_FILEPATH)
+    print(f"Model trained and stored at {OUTPUT_FILEPATH}.")
+    ##################################################

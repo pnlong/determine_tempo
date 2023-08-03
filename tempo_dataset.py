@@ -5,7 +5,7 @@
 # Create a custom audio dataset for PyTorch with torchaudio.
 # Uses songs from my music library
 
-# python ./tempo_dataset.py labels_filepath output_filepath audio_dir seconds_per_sample
+# python ./tempo_dataset.py labels_filepath output_filepath audio_dir
 
 
 # IMPORTS
@@ -20,7 +20,15 @@ import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import pandas as pd
-# sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Volumes/Seagate/artificial_dj_data/tempo_data", "10")
+# sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Volumes/Seagate/artificial_dj_data/tempo_data")
+##################################################
+
+
+# CONSTANTS
+##################################################
+SAMPLE_RATE = 44100 // 2
+SAMPLE_DURATION = 10.0 # in seconds
+STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between each .wav file
 ##################################################
 
 
@@ -29,11 +37,11 @@ import pandas as pd
 
 class tempo_dataset(Dataset):
 
-    def __init__(self, data_filepath, target_sample_rate, sample_duration, device, transformation):
+    def __init__(self, labels_filepath, target_sample_rate, sample_duration, device, transformation):
 
         # import labelled data file, preprocess
         # it is assumed that the data are mono wav files
-        self.data = pd.read_csv(data_filepath, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
+        self.data = pd.read_csv(labels_filepath, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
         self.data = self.data[self.data["path"].apply(lambda path: exists(path))] # remove files that do not exist
         self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
         self.data.reset_index(drop = True) # reset indicies
@@ -118,13 +126,12 @@ def _trim_silence(signal, sample_rate, window_size = 0.1): # window_size = size 
 # The code inside the if statement is not executed when the file's code is imported as a module.
 if __name__ == "__main__":
 
-    # constants
+    # CONSTANTS
+    ##################################################
     LABELS_FILEPATH = sys.argv[1]
     OUTPUT_FILEPATH = sys.argv[2]
     AUDIO_DIR = sys.argv[3]
-    SAMPLE_DURATION = float(sys.argv[4]) # in seconds
-    SAMPLE_RATE = 44100 // 2
-    STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between each .wav file
+    ##################################################
 
 
     # CREATE AND PREPROCESS WAV FILE CHOPS FROM FULL SONGS
@@ -199,7 +206,7 @@ if __name__ == "__main__":
     mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
 
     # instantiate tempo dataset
-    tempo_data = tempo_dataset(data_filepath = OUTPUT_FILEPATH, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device, transformation = mel_spectrogram)
+    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device, transformation = mel_spectrogram)
 
     # test len() functionality
     print(f"There are {len(tempo_data)} samples in the dataset.")
