@@ -68,14 +68,16 @@ class tempo_dataset(Dataset):
         signal, sample_rate = torchaudio.load(self.data.at[index, "path"], format = "wav") # returns the waveform data and sample rate
         # register signal onto device (gpu [cuda] or cpu)
         signal = signal.to(self.device)
-        # resample
-        signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = self.target_sample_rate, device = self.device) # resample for consistent sample rate
-        # pad/crop for fixed signal duration
-        signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
+        # resample; sample_rate was already set in preprocessing
+        # signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = self.target_sample_rate, device = self.device) # resample for consistent sample rate
+        # convert from stereo to mono; already done in preprocessing
+        # signal = _mix_down_if_necessary(signal = signal)
+        # pad/crop for fixed signal duration; duration was already set in preprocessing
+        # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
         # apply transformations
         signal = self.transformation(signal) # convert waveform to melspectrogram
 
-        return signal, self.data.at[index, "tempo"] # returns the transformed signal and the actual BPM
+        return signal, torch.tensor(self.data.at[index, "tempo"], dtype = torch.float) # returns the transformed signal and the actual BPM
     
     def get_info(self, index): # get info (title, artist, original filepath) of a file given its index; return as dictionary
         return self.data.loc[i, ["title", "artist", "key", "path_origin", "path"]].to_dict()
