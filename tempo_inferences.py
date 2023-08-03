@@ -13,7 +13,7 @@ import sys
 import torch
 import torchaudio
 from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION 
-from tempo_neural_network import tempo_nn # import convolution neural network Network class
+from tempo_neural_network import tempo_nn # import neural network class
 # sys.argv = ("./tempo_inferences.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
 ##################################################
 
@@ -28,6 +28,7 @@ NN_FILEPATH = sys.argv[2]
 
 # RELOAD MODEL AND MAKE PREDICTIONS
 ##################################################
+
 # load back the model
 tempo_nn = tempo_nn()
 state_dict = torch.load(NN_FILEPATH)
@@ -55,10 +56,13 @@ print("Making predictions.")
 print("********************")
 tempo_nn.eval()
 with torch.no_grad():
-    predicted = tempo_nn(inputs.to(torch.float32))
+    predictions = torch.flatten(input = tempo_nn(inputs))
+
+# print results
 for i in range(N_PREDICTIONS):
-    print(f"Case {i + 1}: Predicted = '{predicted[i]}', Expected = '{targets[i]}', Correct = {predicted[i] == targets[i]}")
+    print(f"Case {i + 1}: Predicted = {predictions[i]:.5f}, Expected = {targets[i]:.5f}, % Difference = {100 * abs(predictions[i] - targets[i]) / targets[i]:.2f}%")
 print("********************")
-accuracy = sum(predicted[i] == targets[i] for i in range(N_PREDICTIONS)) / N_PREDICTIONS
-print(f"Accuracy: {(100 * accuracy):.2f}%")
+mse = sum((predictions[i] - targets[i])**2 for i in range(N_PREDICTIONS)) / N_PREDICTIONS
+print(f"Mean Squared Error: {(100 * mse):.2f}")
+
 ##################################################
