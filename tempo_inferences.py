@@ -48,7 +48,7 @@ tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
 N_PREDICTIONS = len(tempo_data) if len(tempo_data) < N_PREDICTIONS else N_PREDICTIONS
 inputs_targets = [tempo_data[i] for i in range(N_PREDICTIONS)]
 inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
-targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0)
+targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(N_PREDICTIONS, 1)
 del inputs_targets
 
 # make an inference
@@ -56,15 +56,15 @@ print("Making predictions...")
 print("********************")
 tempo_nn.eval()
 with torch.no_grad():
-    predictions = tempo_nn(inputs)
+    predictions = tempo_nn(inputs).view(N_PREDICTIONS, 1)
 
 # print results
 percent_difference = 100 * torch.div(input = torch.abs(input = predictions - targets), other = targets)
 for i in range(N_PREDICTIONS):
-    print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {percent_difference.item():.2f}%")
+    print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {percent_difference[i].item():.2f}%")
 print("********************")
 error = torch.mean(input = torch.abs(input = predictions - targets)).item()
 print(f"Average Error: {error:.2f}")
-print(f"Average % Difference: {torch.mean(input = percent_difference).item():.2f}")
+print(f"Average % Difference: {torch.mean(input = percent_difference).item():.2f}%")
 
 ##################################################
