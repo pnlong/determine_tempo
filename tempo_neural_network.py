@@ -88,7 +88,7 @@ def train(model, data_loader, loss_function, optimizer, device, epochs):
         # train an epoch
         for inputs, labels in data_loader:
             # register inputs and labels with device
-            inputs, labels = inputs.to(device), labels.unsqueeze(dim = -1).to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
 
             # calculate loss
             predictions = model(inputs)

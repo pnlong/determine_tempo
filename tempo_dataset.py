@@ -30,6 +30,7 @@ import pandas as pd
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 10.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between each .wav file
+SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-validation-test fractions
 ##################################################
 
 
@@ -48,8 +49,7 @@ class tempo_dataset(Dataset):
         self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
 
         # partition into the train, validation, or test dataset
-        set_types = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0}
-        self.data = self.data.sample(frac = set_types["" if set_type not in set_types.keys() else set_type], replace = False, random_state = 1, ignore_index = True)
+        self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, random_state = 1, ignore_index = True)
         self.data.reset_index(drop = True) # reset indicies
 
         # import constants
@@ -77,7 +77,7 @@ class tempo_dataset(Dataset):
         # apply transformations
         signal = self.transformation(signal) # convert waveform to melspectrogram
 
-        return signal, torch.tensor(self.data.at[index, "tempo"], dtype = torch.float) # returns the transformed signal and the actual BPM
+        return signal, torch.tensor([self.data.at[index, "tempo"]], dtype = torch.float) # returns the transformed signal and the actual BPM
     
     def get_info(self, index): # get info (title, artist, original filepath) of a file given its index; return as dictionary
         return self.data.loc[i, ["title", "artist", "key", "path_origin", "path"]].to_dict()
