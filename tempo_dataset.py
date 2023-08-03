@@ -143,27 +143,29 @@ if __name__ == "__main__":
     # CREATE AND PREPROCESS WAV FILE CHOPS FROM FULL SONGS
     ##################################################
 
+    # make sure user wants to proceed
+    wants_to_proceed = input("Are you sure that you want to create a new tempo dataset? If yes, an entirely new dataset will be created. If no, the program will (try) to continue where it left off. [y/n]: ").lower()
+    if wants_to_proceed not in ("y", "n"):
+        print("Quitting program...")
+        sys.exit()
+
     # create audio output directory and output_filepath
     if not exists(AUDIO_DIR): 
         makedirs(AUDIO_DIR)
     if not exists(dirname(OUTPUT_FILEPATH)):
         makedirs(dirname(OUTPUT_FILEPATH))   
 
-    # make sure user wants to proceed
-    wants_to_proceed = input("Are you sure that you want to create a new tempo dataset? If yes, an entirely new dataset will be created. If no, the program will (try) to continue where it left off. [y/n]: ").lower()
-    if wants_to_proceed == "y": # if yes, clear AUDIO_DIR and start anew
-        for filepath in glob(join(AUDIO_DIR, "*")): # clear AUDIO_DIR
+    # deal with AUDIO_DIR and where to start
+    filepaths = natsorted(glob(join(AUDIO_DIR, "*")))
+    if wants_to_proceed == "y" or len(filepaths) == 0: # if yes, clear AUDIO_DIR and start anew
+        for filepath in filepaths: # clear AUDIO_DIR if needed
             remove(filepath)
         start_index = 0
     elif wants_to_proceed == "n": # if no, continue where the program left off
-        filepaths = natsorted(glob(join(AUDIO_DIR, "*")))
         start_index = int(basename(filepaths[len(filepaths) - 1]).split("_")[0])
         for filepath in filepaths[filepaths.index(join(AUDIO_DIR, f"{start_index}_0.wav")):]: ## clear files from AUDIO_DIR that start with the start index or higher (for some reason!?)
             remove(filepath)
-    else: # if the answer wasn't yes or no
-        print("Quitting program...")
-        sys.exit()
-    del wants_to_proceed
+    del filepaths, wants_to_proceed
     
     # determine what device to run things on
     device = "cuda" if torch.cuda.is_available() else "cpu"
