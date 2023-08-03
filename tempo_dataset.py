@@ -178,6 +178,7 @@ if __name__ == "__main__":
     data = data.reset_index(drop = True) # reset indicies
     
     # loop through songs and create .wav files
+    print(f"Starting at song index {start_index}.")
     origin_filepaths, output_filepaths, tempos = [], [], []
     for i in tqdm(data.index[start_index:], desc = "Chopping up songs into WAV files", mininterval = 0.5): # start from start index
 
