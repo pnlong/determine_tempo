@@ -180,7 +180,7 @@ if __name__ == "__main__":
     # loop through songs and create .wav files
     print(f"Starting at song index {start_index}.")
     origin_filepaths, output_filepaths, tempos = [], [], []
-    for i in tqdm(data.index[start_index:], desc = "Chopping up songs into WAV files", mininterval = 0.5): # start from start index
+    for i in tqdm(data.index[start_index:], desc = "Chopping up songs into WAV files"): # start from start index
 
         # preprocess audio
         try: # try to import the file
@@ -202,9 +202,6 @@ if __name__ == "__main__":
             output_filepaths.append(path) # add filepath to output_filepaths
             tempos.append(data.at[i, "tempo"]) # add tempo to tempos
         
-        # add some wait time buffer so ffmpeg doesn't overload
-        wait(0.5)
-
     # write to OUTPUT_FILEPATH
     data = data.rename(columns = {"path": "path_origin"}).drop(columns = ["tempo"]) # rename path column in the original dataframe
     tempo_data = pd.DataFrame(data = {"path_origin": origin_filepaths, "path": output_filepaths, "tempo": tempos}) # create tempo_data dataframe
