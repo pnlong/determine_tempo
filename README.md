@@ -30,7 +30,7 @@ I can use two approaches for this neural network:
 
 ### *tempo_dataset.py*
 
-Creates a dataset of *.wav* files that are labelled by tempo. Will be used to train a neural network. The program will ask the user whether or not they want to create a new dataset; if the user replies yes, the program will begin creating a dataset from scratch; if no, the program will try and resume where it left off.
+Creates a dataset of *.wav* files that are labelled by tempo. Will be used to train a neural network.
 
 ```
 python ./tempo_dataset.py labels_filepath output_filepath audio_dir
