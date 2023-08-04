@@ -122,6 +122,12 @@ if __name__ == "__main__":
     # determine device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using {device} device.")
+    if device == "cuda":
+        print("********************")
+        print(f"Device Name: {torch.cuda.get_device_name(0)}")
+        print("Memory Usage:")
+        print(f"\t- Allocated: {(torch.cuda.memory_allocated(0)/ (1024 ** 3)):.1f} GB")
+        print(f"\t- Cached: {(torch.cuda.memory_reserved(0) / (1024 ** 3)):.1f} GB")
     
     # instantiate our dataset object
     tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
