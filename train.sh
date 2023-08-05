@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=train_tempo_nn       ## job name
 #SBATCH -A tdlong_lab_gpu               ## account to charge
-#SBATCH -p free-gpu                     ## run on the gpu partition
+#SBATCH -p gpu                          ## run on the gpu partition
 #SBATCH --nodes=1                       ## run on a single node
 #SBATCH --ntasks=1                      ## request 1 task
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
@@ -19,11 +19,10 @@ data="${artificial_dj}/data"
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
 
 # module load conda and python
-module load anaconda/2022.05
-module load python/3.10.2
+module load anaconda/2021.11
 
 # activate conda env
-source /data/homezvol2/pnlong/.condarc
+source "${artificial_dj}/envs"
 conda activate "${artificial_dj}/envs"
 
 # run python script
