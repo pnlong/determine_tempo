@@ -23,10 +23,8 @@ module load anaconda/2022.05
 module load python/3.10.2
 
 # activate conda env
+source /data/homezvol2/pnlong/.condarc
 conda activate "${artificial_dj}/envs"
 
 # run python script
 python "${artificial_dj}/determine_tempo/tempo_neural_network.py" "${data}/tempo_data.cluster.tsv" "${data}/tempo_nn.pth"
-
-# deactivate conda env
-conda deactivate
