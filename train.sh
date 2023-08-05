@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=train_tempo_nn       ## pytorch
+#SBATCH --job-name=train_tempo_nn       ## job name
 #SBATCH -A tdlong_lab_gpu               ## account to charge
 #SBATCH -p free-gpu                     ## run on the gpu partition
 #SBATCH --nodes=1                       ## run on a single node
