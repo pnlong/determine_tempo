@@ -64,3 +64,21 @@ python ./tempo_inference.py labels_filepath nn_filepath
 The arguments are the same as for `tempo_neural_network.py`. See above.
 
 ---
+
+
+### *train.sh*
+
+Runs `tempo_neural_network.py` on a cluster. Assumes `tempo_dataset.py` has already been run.
+
+```
+sbatch ./train.sh
+```
+
+
+### *gunzip_tempo_data.sh*
+
+"Ungzips" and "untars" the directory created by `tempo_dataset.py` on the cluster.
+
+```
+sbatch ./gunzip_tempo_data.sh
+```

@@ -10,7 +10,11 @@
 #SBATCH --error=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train_tempo_nn.err            ## error log file
 #SBATCH --output=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train_tempo_nn.out           ## output log file
 
-# train the neural network on a cluster; request GPU partition
+# README
+# Phillip Long
+# August 4, 2023
+# script to train the neural network on the cluster; request GPU partition
+# assumes I have already run tempo_dataset.py
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
