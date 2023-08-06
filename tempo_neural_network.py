@@ -103,7 +103,7 @@ def train(model, data_loader, loss_function, optimizer, device, epochs):
         # print out updates
         print(f"EPOCH {epoch + 1}")
         print(f"Loss: {loss_per_epoch:.5f}")
-        print("********************")
+        print("----------------------------------------------------------------")
 
 ##################################################
 
@@ -120,14 +120,15 @@ if __name__ == "__main__":
     ##################################################
 
     # determine device
+    print("----------------------------------------------------------------")
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using {device} device.")
+    print(f"Device: {device.upper()}")
     if device == "cuda":
-        print("********************")
         print(f"Device Name: {torch.cuda.get_device_name(0)}")
         print("Memory Usage:")
         print(f"\t- Allocated: {(torch.cuda.memory_allocated(0)/ (1024 ** 3)):.1f} GB")
         print(f"\t- Cached: {(torch.cuda.memory_reserved(0) / (1024 ** 3)):.1f} GB")
+    print("================================================================")
     
     # instantiate our dataset object
     tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
@@ -139,11 +140,9 @@ if __name__ == "__main__":
                                )
 
     # construct model and assign it to device, also summarize 
-    print("********************")
     print("Summary of Neural Network:")
     tempo_nn = tempo_nn().to(device)
     summary(model = tempo_nn, input_size = tempo_data[0][0].shape) # input_size = (# of channels, # of mels [frequency axis], time axis)
-    print("********************")
 
     # instantiate data loader, loss function, and optimizer
     data_loader = DataLoader(tempo_data, batch_size = BATCH_SIZE)
@@ -152,6 +151,7 @@ if __name__ == "__main__":
 
     # train
     train(model = tempo_nn, data_loader = data_loader, loss_function = loss_function, optimizer = optimizer, device = device, epochs = EPOCHS)
+    print("================================================================")
     print("Training is done.")
 
     # store trained model

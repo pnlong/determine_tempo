@@ -53,7 +53,7 @@ del inputs_targets
 
 # make an inference
 print("Making predictions...")
-print("********************")
+print("----------------------------------------------------------------")
 tempo_nn.eval()
 with torch.no_grad():
     predictions = tempo_nn(inputs).view(N_PREDICTIONS, 1)
@@ -62,7 +62,7 @@ with torch.no_grad():
 percent_difference = 100 * torch.div(input = torch.abs(input = predictions - targets), other = targets)
 for i in range(N_PREDICTIONS):
     print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {percent_difference[i].item():.2f}%")
-print("********************")
+print("----------------------------------------------------------------")
 error = torch.mean(input = torch.abs(input = predictions - targets)).item()
 print(f"Average Error: {error:.2f}")
 print(f"Average % Difference: {torch.mean(input = percent_difference).item():.2f}%")

@@ -19,10 +19,11 @@ data="${artificial_dj}/data"
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
 
 # module load conda and python
-module load anaconda/2021.11
+module load anaconda/2022.05
+module load python/3.10.2
 
 # activate conda env
-source "${artificial_dj}/envs"
+eval "$(/opt/apps/anaconda/2022.05/bin/conda 'shell.bash' 'hook')"
 conda activate "${artificial_dj}/envs"
 
 # run python script
