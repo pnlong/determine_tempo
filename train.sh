@@ -24,7 +24,6 @@ data="${artificial_dj}/data"
 
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
-. ~/.mycondainit
 
 # activate conda env
 eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
