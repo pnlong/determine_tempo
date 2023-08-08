@@ -10,8 +10,7 @@
 # August 4, 2023
 # ungzips and untars the directory created by tempo_dataset.py on the cluster
 
-artificial_dj="/dfs7/adl/pnlong/artificial_dj"
-data="${artificial_dj}/data"
+data="/dfs7/adl/pnlong/artificial_dj/data"
 
 # tar gzip
 # tar -zcvf /Volumes/Seagate/artificial_dj_data/tempo_data.tar.gz /Volumes/Seagate/artificial_dj_data/tempo_data
