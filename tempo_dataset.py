@@ -14,7 +14,6 @@ import sys
 from os.path import exists, join, dirname, basename
 from os import makedirs, remove
 from glob import glob
-from natsort import natsorted
 from time import sleep as wait
 from tqdm import tqdm
 import torch

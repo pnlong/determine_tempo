@@ -7,8 +7,8 @@
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
 #SBATCH -t 2:00                         ## 2-minute run time limit
 #SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
-#SBATCH --error=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train_tempo_nn.err            ## error log file
-#SBATCH --output=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train_tempo_nn.out           ## output log file
+#SBATCH --error=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train.err            ## error log file
+#SBATCH --output=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train.out           ## output log file
 
 # README
 # Phillip Long
@@ -22,13 +22,13 @@ data="${artificial_dj}/data"
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
 
-# module load conda and python
-module load anaconda/2022.05
-module load python/3.10.2
+# module load conda (hpc3 help says not to load python + conda together)
+module load miniconda3/4.12.0
+. ~/.mycondainit
 
 # activate conda env
-eval "$(/opt/apps/anaconda/2022.05/bin/conda 'shell.bash' 'hook')"
-conda activate "${artificial_dj}/envs"
+eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
+conda activate artificial_dj
 
 # run python script
 python "${artificial_dj}/determine_tempo/tempo_neural_network.py" "${data}/tempo_data.cluster.tsv" "${data}/tempo_nn.pth"
