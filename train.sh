@@ -5,7 +5,6 @@
 #SBATCH --nodes=1                       ## run on a single node
 #SBATCH --ntasks=1                      ## request 1 task
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
-#SBATCH -t 2:00                         ## 2-minute run time limit
 #SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
 #SBATCH --error=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train.err            ## error log file
 #SBATCH --output=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train.out           ## output log file
