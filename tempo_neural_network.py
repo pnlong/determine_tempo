@@ -25,7 +25,7 @@ from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION # dataset 
 # CONSTANTS
 ##################################################
 BATCH_SIZE = 128
-EPOCHS = 10
+EPOCHS = 100
 LEARNING_RATE = 1e-3
 ##################################################
 
@@ -126,8 +126,8 @@ if __name__ == "__main__":
     if device == "cuda":
         print(f"Device Name: {torch.cuda.get_device_name(0)}")
         print("Memory Usage:")
-        print(f"\t- Allocated: {(torch.cuda.memory_allocated(0)/ (1024 ** 3)):.1f} GB")
-        print(f"\t- Cached: {(torch.cuda.memory_reserved(0) / (1024 ** 3)):.1f} GB")
+        print(f"  - Allocated: {(torch.cuda.memory_allocated(0)/ (1024 ** 3)):.1f} GB")
+        print(f"  - Cached: {(torch.cuda.memory_reserved(0) / (1024 ** 3)):.1f} GB")
     print("================================================================")
     
     # instantiate our dataset object
@@ -143,6 +143,7 @@ if __name__ == "__main__":
     print("Summary of Neural Network:")
     tempo_nn = tempo_nn().to(device)
     summary(model = tempo_nn, input_size = tempo_data[0][0].shape) # input_size = (# of channels, # of mels [frequency axis], time axis)
+    print("================================================================")
 
     # instantiate data loader, loss function, and optimizer
     data_loader = DataLoader(tempo_data, batch_size = BATCH_SIZE)
