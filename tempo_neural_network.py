@@ -12,6 +12,7 @@
 ##################################################
 import sys
 from tqdm import tqdm
+from time import time
 import torch
 from torch import nn
 from torchsummary import summary
@@ -151,9 +152,14 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(tempo_nn.parameters(), lr = LEARNING_RATE)
 
     # train
+    start_time = time()
     train(model = tempo_nn, data_loader = data_loader, loss_function = loss_function, optimizer = optimizer, device = device, epochs = EPOCHS)
+    end_time = time()
     print("================================================================")
     print("Training is done.")
+    total_time = end_time - start_time
+    del end_time, start_time
+    print(f"Time Elapsed: {total_time // (60 * 60):.0f} hours and {(total_time % (60 * 60)) / 60:.1f} minutes")
 
     # store trained model
     torch.save(tempo_nn.state_dict(), NN_FILEPATH)
