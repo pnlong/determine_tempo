@@ -19,7 +19,7 @@ tempo_data="${data}/tempo_data"
 tar -xvzf "${data}/tempo_data.tar.gz" -C "${tempo_data}"
 
 # rename tempo_data
-# mv  "${tempo_data}" "${tempo_data}_temp"
+# mv "${tempo_data}" "${tempo_data}_temp"
 # move unzipped tarball to right location
 # mv "${tempo_data}_temp/Volumes/Seagate/artificial_dj_data/tempo_data" "${tempo_data}"
 
