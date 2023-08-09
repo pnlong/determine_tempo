@@ -29,13 +29,9 @@ NN_FILEPATH = sys.argv[2]
 # RELOAD MODEL AND MAKE PREDICTIONS
 ##################################################
 
-# load device
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Device: {device.upper()}")
-
 # load back the model
 tempo_nn = tempo_nn()
-state_dict = torch.load(NN_FILEPATH, map_location = device)
+state_dict = torch.load(NN_FILEPATH, map_location = "cpu")
 tempo_nn.load_state_dict(state_dict)
 print("Imported neural network parameters.")
 
