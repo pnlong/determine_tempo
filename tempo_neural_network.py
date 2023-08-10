@@ -14,14 +14,14 @@ import sys
 from tqdm import tqdm
 from time import time
 from os.path import exists, join, dirname
-import matplotlib.pyplot as plt
 import torch
 from torch import nn
 from torchsummary import summary
 from torch.utils.data import DataLoader
 import torchaudio
+import matplotlib.pyplot as plt
 from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION # dataset class + some constants
-# sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth", "")
+# sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
 ##################################################
 
 
@@ -66,7 +66,7 @@ class tempo_nn(nn.Module):
 # MODEL TRAINING FUNCTION
 ##################################################
 # train the whole model
-def train(model, data_loader, loss_function, optimizer, device, start_epoch):
+def train(model, data_loader, loss_function, optimizer, device, start_epoch, dataset):
 
     epochs_to_train = range(start_epoch, start_epoch + EPOCHS)
     losses = []
@@ -89,11 +89,17 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch):
             optimizer.step() # update parameters
             loss_per_epoch += loss.item()
 
-        # print out updates
-        print(f"EPOCH {epoch + 1}")
-        print(f"Loss: {loss_per_epoch:.5f}")
-        print("----------------------------------------------------------------")
+        # calculate "accuracy" statistic
+        n_predictions = min(100, len(dataset)) # number of samples to use in statistic
+        inputs, targets = dataset.sample(n_predictions = n_predictions) # get a sample of n_predictions rows from the dataset
+        model.eval() # turn on eval mode
+        with torch.no_grad():
+            predictions = model(inputs).view(n_predictions, 1) # make prdictions, reshape to match the targets tensor from dataset.sample
+        model.train() # turn off eval mode, back to train mode
+        error = torch.mean(input = torch.abs(input = predictions - targets)).item()
+        del inputs, predictions, targets
 
+        # update losses list
         losses.append(loss_per_epoch)
 
         # save current model
@@ -104,15 +110,19 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch):
         }
         torch.save(checkpoint, NN_FILEPATH)
 
+        # print out updates
+        print(f"EPOCH {epoch + 1}")
+        print(f"Loss: {loss_per_epoch:.5f}")
+        print(f"Average Error: {error:.3f}")
+        print("----------------------------------------------------------------")
 
-    # plot loss as a function of n iterations
+    # plot loss as a function of iterations
     plt.plot([epoch + 1 for epoch in epochs_to_train], losses, "-b")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Learning Curve")
     plt.savefig(join(dirname(NN_FILEPATH), "loss.png")) # save image
     
-
 ##################################################
 
 
@@ -169,7 +179,7 @@ if __name__ == "__main__":
 
     # train
     start_time = time()
-    train(model = tempo_nn, data_loader = data_loader, loss_function = loss_function, optimizer = optimizer, device = device, start_epoch = start_epoch)
+    train(model = tempo_nn, data_loader = data_loader, loss_function = loss_function, optimizer = optimizer, device = device, start_epoch = start_epoch, dataset = tempo_data)
     end_time = time()
     print("================================================================")
     print("Training is done.")

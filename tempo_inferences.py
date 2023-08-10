@@ -11,11 +11,11 @@
 # IMPORTS
 ##################################################
 import sys
-from numpy import mean, percentile
 from os.path import join, dirname
-import matplotlib.pyplot as plt
 import torch
 import torchaudio
+from numpy import mean, percentile
+import matplotlib.pyplot as plt
 from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION 
 from tempo_neural_network import tempo_nn # import neural network class
 # sys.argv = ("./tempo_inferences.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth", "20")
@@ -53,10 +53,7 @@ tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
 # get a sample from the urban sound dataset for inference
 N_PREDICTIONS = int(sys.argv[3]) if len(sys.argv) == 4 else len(tempo_data)
 N_PREDICTIONS = len(tempo_data) if N_PREDICTIONS > len(tempo_data)  else N_PREDICTIONS
-inputs_targets = [tempo_data[i] for i in range(N_PREDICTIONS)]
-inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
-targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(N_PREDICTIONS, 1)
-del inputs_targets
+inputs, targets = tempo_data.sample(n_predictions = N_PREDICTIONS)
 
 # make an inference
 print("Making predictions...")
