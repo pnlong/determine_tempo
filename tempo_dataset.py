@@ -3,7 +3,7 @@
 # August 1, 2023
 
 # Create a custom audio dataset for PyTorch with torchaudio.
-# Uses songs from my music library
+# Uses songs from my music library.
 
 # python ./tempo_dataset.py labels_filepath output_filepath audio_dir
 
@@ -27,7 +27,7 @@ import pandas as pd
 ##################################################
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 10.0 # in seconds
-STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between each .wav file
+STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between the start of each .wav file
 SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-validation-test fractions
 ##################################################
 
