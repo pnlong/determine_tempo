@@ -11,10 +11,9 @@
 # IMPORTS
 ##################################################
 import sys
-from os.path import exists, join, dirname, basename
+from os.path import exists, join, dirname
 from os import makedirs, remove
 from glob import glob
-from time import sleep as wait
 from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
@@ -48,7 +47,7 @@ class tempo_dataset(Dataset):
         self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
 
         # partition into the train, validation, or test dataset
-        self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, random_state = 1, ignore_index = True)
+        self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, ignore_index = True)
         self.data.reset_index(drop = True) # reset indicies
 
         # import constants
