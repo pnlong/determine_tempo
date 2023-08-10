@@ -5,7 +5,7 @@
 # Uses a neural network to make predictions of songs' tempos.
 
 # python ./tempo_inferences.py labels_filepath nn_filepath n_predictions
-# python /dfs7/adl/pnlong/artificial_dj/determine_tempo/tempo_inferences.py "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv" "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth" "100"
+# python /dfs7/adl/pnlong/artificial_dj/determine_tempo/tempo_inferences.py "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv" "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth" "1000"
 
 
 # IMPORTS
@@ -87,5 +87,6 @@ plt.xlabel("Percentile")
 plt.ylabel("Difference")
 plt.title("Validation Data Percentiles")
 plt.savefig(join(dirname(NN_FILEPATH), "percentile.png")) # save image
+print("Outputting percentile plot...")
 
 ##################################################
