@@ -71,7 +71,7 @@ for i in range(N_PREDICTIONS):
     print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {error[i].item():.2f}%")
 print("----------------------------------------------------------------")
 print(f"Average Error: {mean(error):.2f}")
-print(f"5% percentile:  {percentile(error, q = 5):.2f}")
+print(f"5% percentile: {percentile(error, q = 5):.2f}")
 print(f"10% percentile: {percentile(error, q = 10):.2f}")
 print(f"25% percentile: {percentile(error, q = 25):.2f}")
 print(f"50% percentile: {percentile(error, q = 50):.2f}")

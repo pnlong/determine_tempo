@@ -138,7 +138,8 @@ if __name__ == "__main__":
                                target_sample_rate = SAMPLE_RATE,
                                sample_duration = SAMPLE_DURATION,
                                device = device,
-                               transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
+                               transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64),
+                               use_pseudo_replicates = False
                                )
 
     # construct model and assign it to device, also summarize 

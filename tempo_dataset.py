@@ -37,7 +37,7 @@ SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-vali
 
 class tempo_dataset(Dataset):
 
-    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, transformation):
+    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, transformation, use_pseudo_replicates = True):
         # set_type can take on one of three values: ("train", "validation", "test")
 
         # import labelled data file, preprocess
@@ -45,6 +45,8 @@ class tempo_dataset(Dataset):
         self.data = pd.read_csv(labels_filepath, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
         self.data = self.data[self.data["path"].apply(lambda path: exists(path))] # remove files that do not exist
         self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
+        if not use_pseudo_replicates: # if no pseudo-replicates, transform self.data once more
+            self.data = self.data.groupby(["title", "artist", "key", "path_origin"]).apply(pd.DataFrame.sample, n = 1).reset_index(drop = True) # randomly pick a sample from each song
 
         # partition into the train, validation, or test dataset
         self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, ignore_index = True)
