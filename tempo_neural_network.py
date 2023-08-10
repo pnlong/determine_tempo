@@ -73,6 +73,7 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch, dat
     for epoch in epochs_to_train: # epoch for loop
 
         loss_per_epoch = 0
+        start_time_epoch = time()
 
         # train an epoch
         for inputs, labels in data_loader:
@@ -89,6 +90,8 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch, dat
             optimizer.step() # update parameters
             loss_per_epoch += loss.item()
 
+        end_time_epoch = time()
+
         # calculate "accuracy" statistic
         n_predictions = min(100, len(dataset)) # number of samples to use in statistic
         inputs, targets = dataset.sample(n_predictions = n_predictions) # get a sample of n_predictions rows from the dataset
@@ -102,6 +105,10 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch, dat
         # update losses list
         losses.append(loss_per_epoch)
 
+        # calculate time elapsed
+        total_time_epoch = end_time_epoch - start_time_epoch
+        del end_time_epoch, start_time_epoch
+
         # save current model
         checkpoint = {
             "epoch": epoch,
@@ -114,6 +121,7 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch, dat
         print(f"EPOCH {epoch + 1}")
         print(f"Loss: {loss_per_epoch:.5f}")
         print(f"Average Error: {error:.3f}")
+        print(f"Time: {(total_time_epoch / 60):.1f} minutes")
         print("----------------------------------------------------------------")
 
     # plot loss as a function of iterations
