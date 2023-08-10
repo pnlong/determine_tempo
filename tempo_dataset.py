@@ -46,7 +46,7 @@ class tempo_dataset(Dataset):
         self.data = self.data[self.data["path"].apply(lambda path: exists(path))] # remove files that do not exist
         self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
         if not use_pseudo_replicates: # if no pseudo-replicates, transform self.data once more
-            self.data = self.data.groupby(["title", "artist", "key", "path_origin"]).apply(pd.DataFrame.sample, n = 1).reset_index(drop = True) # randomly pick a sample from each song
+            self.data = self.data.groupby(["title", "artist", "key", "path_origin"]).sample(n = 1).reset_index(drop = True) # randomly pick a sample from each song
 
         # partition into the train, validation, or test dataset
         self.data = self.data.sample(frac = SET_TYPES["" if set_type not in SET_TYPES.keys() else set_type], replace = False, ignore_index = True)
