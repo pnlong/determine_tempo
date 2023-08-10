@@ -107,7 +107,7 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch):
 
     # plot loss as a function of n iterations
     plt.plot([epoch + 1 for epoch in epochs_to_train], losses, "-b")
-    plt.xlabel("Iteration")
+    plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Learning Curve")
     plt.savefig(join(dirname(NN_FILEPATH), "loss.png"))  # save image
