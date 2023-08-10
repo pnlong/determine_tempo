@@ -68,7 +68,7 @@ with torch.no_grad():
 # print results
 error = torch.abs(input = predictions - targets).numpy()
 for i in range(N_PREDICTIONS):
-    print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {error[i].item():.2f}%")
+    print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, Difference = {error[i].item():.2f}")
 print("----------------------------------------------------------------")
 print(f"Average Error: {mean(error):.2f}")
 print(f"5% percentile: {percentile(error, q = 5):.2f}")
