@@ -5,11 +5,15 @@
 # Uses a neural network to make predictions of songs' tempos.
 
 # python ./tempo_inferences.py labels_filepath nn_filepath n_predictions
+# python /dfs7/adl/pnlong/artificial_dj/determine_tempo/tempo_inferences.py "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv" "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth" "100"
 
 
 # IMPORTS
 ##################################################
 import sys
+from numpy import mean, percentile
+from os.path import join, dirname
+import matplotlib.pyplot as plt
 import torch
 import torchaudio
 from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION 
@@ -62,12 +66,26 @@ with torch.no_grad():
     predictions = tempo_nn(inputs).view(N_PREDICTIONS, 1)
 
 # print results
-percent_difference = 100 * torch.div(input = torch.abs(input = predictions - targets), other = targets)
+error = torch.abs(input = predictions - targets).numpy()
 for i in range(N_PREDICTIONS):
-    print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {percent_difference[i].item():.2f}%")
+    print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, % Difference = {error[i].item():.2f}%")
 print("----------------------------------------------------------------")
-error = torch.mean(input = torch.abs(input = predictions - targets)).item()
-print(f"Average Error: {error:.2f}")
-print(f"Average % Difference: {torch.mean(input = percent_difference).item():.2f}%")
+print(f"Average Error: {mean(error):.2f}")
+print(f"5% percentile:  {percentile(error, q = 5):.2f}")
+print(f"10% percentile: {percentile(error, q = 10):.2f}")
+print(f"25% percentile: {percentile(error, q = 25):.2f}")
+print(f"50% percentile: {percentile(error, q = 50):.2f}")
+print(f"75% percentile: {percentile(error, q = 75):.2f}")
+print(f"90% percentile: {percentile(error, q = 90):.2f}")
+print(f"95% percentile: {percentile(error, q = 95):.2f}")
+
+# output percentile plot
+percentiles = range(0, 101)
+percentile_values = [float(percentile(error, q = i)) for i in percentiles]
+plt.plot(percentiles, percentile_values, "-b")
+plt.xlabel("Percentile")
+plt.ylabel("Difference")
+plt.title("Validation Data Percentiles")
+plt.savefig(join(dirname(NN_FILEPATH), "percentile.png")) # save image
 
 ##################################################

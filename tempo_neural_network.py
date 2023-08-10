@@ -110,7 +110,7 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Learning Curve")
-    plt.savefig(join(dirname(NN_FILEPATH), "loss.png"))  # save image
+    plt.savefig(join(dirname(NN_FILEPATH), "loss.png")) # save image
     
 
 ##################################################
