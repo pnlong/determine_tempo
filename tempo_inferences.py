@@ -20,7 +20,7 @@ from tempo_neural_network import tempo_nn # import neural network class
 
 # CONSTANTS
 ##################################################
-N_PREDICTIONS = 20
+N_PREDICTIONS = 40
 LABELS_FILEPATH = sys.argv[1]
 NN_FILEPATH = sys.argv[2]
 ##################################################
@@ -29,10 +29,13 @@ NN_FILEPATH = sys.argv[2]
 # RELOAD MODEL AND MAKE PREDICTIONS
 ##################################################
 
+# I want to do all the predictions on CPU, GPU seems a bit much
+device = "cpu"
+
 # load back the model
 tempo_nn = tempo_nn()
-state_dict = torch.load(NN_FILEPATH, map_location = "cpu")
-tempo_nn.load_state_dict(state_dict)
+state_dict = torch.load(NN_FILEPATH, map_location = device)
+tempo_nn.load_state_dict(state_dict["state_dict"])
 print("Imported neural network parameters.")
 
 # instantiate our dataset object
@@ -40,7 +43,7 @@ tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
                            set_type = "validate",
                            target_sample_rate = SAMPLE_RATE,
                            sample_duration = SAMPLE_DURATION,
-                           device = "cpu",
+                           device = device,
                            transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
                            )
 

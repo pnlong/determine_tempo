@@ -28,7 +28,7 @@ from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION # dataset 
 # CONSTANTS
 ##################################################
 BATCH_SIZE = 128
-EPOCHS = 100
+EPOCHS = 10
 LEARNING_RATE = 1e-3
 ##################################################
 
