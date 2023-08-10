@@ -4,7 +4,7 @@
 
 # Uses a neural network to make predictions of songs' tempos.
 
-# python ./tempo_inferences.py labels_filepath nn_filepath
+# python ./tempo_inferences.py labels_filepath nn_filepath n_predictions
 
 
 # IMPORTS
@@ -14,13 +14,12 @@ import torch
 import torchaudio
 from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION 
 from tempo_neural_network import tempo_nn # import neural network class
-# sys.argv = ("./tempo_inferences.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
+# sys.argv = ("./tempo_inferences.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth", "20")
 ##################################################
 
 
 # CONSTANTS
 ##################################################
-N_PREDICTIONS = 40
 LABELS_FILEPATH = sys.argv[1]
 NN_FILEPATH = sys.argv[2]
 ##################################################
@@ -48,7 +47,8 @@ tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
                            )
 
 # get a sample from the urban sound dataset for inference
-N_PREDICTIONS = len(tempo_data) if len(tempo_data) < N_PREDICTIONS else N_PREDICTIONS
+N_PREDICTIONS = int(sys.argv[3]) if len(sys.argv) == 4 else len(tempo_data)
+N_PREDICTIONS = len(tempo_data) if N_PREDICTIONS > len(tempo_data)  else N_PREDICTIONS
 inputs_targets = [tempo_data[i] for i in range(N_PREDICTIONS)]
 inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
 targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(N_PREDICTIONS, 1)
