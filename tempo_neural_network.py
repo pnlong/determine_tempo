@@ -5,7 +5,7 @@
 # Creates and trains a linear regression neural network in PyTorch.
 # Given an audio file as input, it outputs a single number representing the song's tempo in Beats per Minute (BPM).
 
-# python ./tempo_neural_network.py labels_filepath nn_filepath
+# python ./tempo_neural_network.py labels_filepath nn_filepath epochs
 
 
 # IMPORTS
@@ -21,15 +21,15 @@ from torchsummary import summary
 from torch.utils.data import DataLoader
 import torchaudio
 from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION # dataset class + some constants
-# sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
+# sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth", "")
 ##################################################
 
 
 # CONSTANTS
 ##################################################
 BATCH_SIZE = 128
-EPOCHS = 10
 LEARNING_RATE = 1e-3
+EPOCHS = int(sys.argv[3]) if len(sys.argv) == 4 else 10
 ##################################################
 
 
