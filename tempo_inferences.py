@@ -13,10 +13,9 @@
 import sys
 from os.path import join, dirname
 import torch
-import torchaudio
 from numpy import mean, percentile
 import matplotlib.pyplot as plt
-from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION 
+from tempo_dataset import tempo_dataset # import dataset class
 from tempo_neural_network import tempo_nn # import neural network class
 # sys.argv = ("./tempo_inferences.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth", "20")
 ##################################################
@@ -42,12 +41,7 @@ tempo_nn.load_state_dict(state_dict["state_dict"])
 print("Imported neural network parameters.")
 
 # instantiate our dataset object
-tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
-                           set_type = "validate",
-                           target_sample_rate = SAMPLE_RATE,
-                           sample_duration = SAMPLE_DURATION,
-                           device = device
-                           )
+tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH, set_type = "validate", device = device)
 
 # get a sample from the urban sound dataset for inference
 N_PREDICTIONS = int(sys.argv[3]) if len(sys.argv) == 4 else len(tempo_data)

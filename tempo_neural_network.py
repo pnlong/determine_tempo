@@ -11,19 +11,18 @@
 # IMPORTS
 ##################################################
 import sys
-from tqdm import tqdm
 from time import time
-from os.path import exists, join, dirname
+from os.path import exists
 import torch
 from torch import nn
 from torchsummary import summary
 from torch.utils.data import DataLoader
-import torchaudio
 import pandas as pd
 import matplotlib.pyplot as plt
 from numpy import percentile
-from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION # dataset class + some constants
+from tempo_dataset import tempo_dataset # import dataset class
 # sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
+# sys.argv = ("./tempo_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth")
 ##################################################
 
 
@@ -101,6 +100,7 @@ def train(model, dataset, optimizer, device, start_epoch):
             optimizer.step() # update parameters
             loss_per_epoch += (BATCH_SIZE * loss.item()) if (i < (len(dataset) // BATCH_SIZE)) else ((len(dataset) % BATCH_SIZE) * loss.item())
             i += 1
+        # print(f"i = {i}, {((i - 1) * BATCH_SIZE) + (len(dataset) % BATCH_SIZE)} == {len(dataset)}") # for debugging
         del i
         
         # calculate statistics
@@ -113,11 +113,12 @@ def train(model, dataset, optimizer, device, start_epoch):
         with torch.no_grad():
             predictions = model(inputs).view(n_predictions, 1) # make prdictions, reshape to match the targets tensor from dataset.sample
         model.train() # turn off eval mode, back to train mode
-        error = torch.mean(input = torch.abs(input = predictions - targets)).item()
+        error = torch.abs(input = predictions - targets)
         percentiles = range(0, 101)
         percentile_values = percentile(error, q = percentiles)
         percentiles_per_epoch = pd.concat([percentiles_per_epoch, pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values})])
         del inputs, predictions, targets, percentiles
+        error = torch.mean(input = error).item()
 
         # calculate loss per epoch, update losses list
         loss_per_epoch = loss_per_epoch / len(dataset)
@@ -137,7 +138,7 @@ def train(model, dataset, optimizer, device, start_epoch):
 
         # print out updates
         print(f"EPOCH {epoch + 1}")
-        print(f"Loss: {loss_per_epoch:.5f}")
+        print(f"Loss: {loss_per_epoch:.3f}")
         print(f"Average Error: {error:.3f}")
         print(f"Five Number Summary: {' '.join((f'{i:.2f}' for i in (percentile_values[j] for j in (0, 25, 50, 75, 100))))}")
         print(f"Time: {(total_time_epoch / 60):.1f} minutes")
@@ -155,8 +156,8 @@ def train(model, dataset, optimizer, device, start_epoch):
     loss_plot.set_title("Learning Curve")
 
     # plot percentiles plot over each epoch (final 3 epochs)
-    colors = ["b", "g", "r", "c", "m", "y", "k"] # length is same as n_epochs
-    n_epochs = min(3, len(colors))
+    colors = ["b", "g", "r", "c", "m", "y", "k"]
+    n_epochs = min(EPOCHS, 5, len(colors))
     colors = colors[:n_epochs]
     percentiles_per_epoch = percentiles_per_epoch[percentiles_per_epoch["epoch"] > (max(percentiles_per_epoch["epoch"] - n_epochs))]
     for i, epoch in enumerate(sorted(pd.unique(percentiles_per_epoch["epoch"]))):
@@ -193,13 +194,7 @@ if __name__ == "__main__":
     print(f"Device: {device.upper()}")
     
     # instantiate our dataset object
-    tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
-                               set_type = "train",
-                               target_sample_rate = SAMPLE_RATE,
-                               sample_duration = SAMPLE_DURATION,
-                               device = device,
-                               use_pseudo_replicates = True
-                               )
+    tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH, set_type = "train", device = device)
 
     # construct model and assign it to device, also summarize 
     tempo_nn = tempo_nn().to(device)

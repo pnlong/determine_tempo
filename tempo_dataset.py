@@ -37,7 +37,7 @@ SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-vali
 
 class tempo_dataset(Dataset):
 
-    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, use_pseudo_replicates = True):
+    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
         # set_type can take on one of three values: ("train", "validation", "test")
 
         # import labelled data file, preprocess
@@ -53,8 +53,8 @@ class tempo_dataset(Dataset):
         self.data.reset_index(drop = True) # reset indicies
 
         # import constants
-        self.target_sample_rate = target_sample_rate
-        self.sample_duration = sample_duration
+        # self.target_sample_rate = target_sample_rate # not being used right now
+        # self.sample_duration = sample_duration # not being used right now
         self.device = device
 
         # import torch audio transformation(s), mel spectrogram transformation in this case
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     ##################################################
 
     # instantiate tempo dataset
-    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device)
+    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", device = device)
 
     # test len() functionality
     print(f"There are {len(tempo_data)} samples in the dataset.")
