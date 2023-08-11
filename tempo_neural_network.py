@@ -19,7 +19,9 @@ from torch import nn
 from torchsummary import summary
 from torch.utils.data import DataLoader
 import torchaudio
+import pandas as pd
 import matplotlib.pyplot as plt
+from numpy import percentile
 from tempo_dataset import tempo_dataset, SAMPLE_RATE, SAMPLE_DURATION # dataset class + some constants
 # sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
 ##################################################
@@ -66,16 +68,25 @@ class tempo_nn(nn.Module):
 # MODEL TRAINING FUNCTION
 ##################################################
 # train the whole model
-def train(model, data_loader, loss_function, optimizer, device, start_epoch, dataset):
+def train(model, dataset, optimizer, device, start_epoch):
 
+    # instantiate loss function and data loader
+    loss_function = nn.MSELoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
+    data_loader = DataLoader(dataset = dataset, batch_size = BATCH_SIZE, shuffle = True) # shuffles the batches each epoch to reduce overfitting
+
+    # tracking statistics
     epochs_to_train = range(start_epoch, start_epoch + EPOCHS)
     losses = []
-    for epoch in epochs_to_train: # epoch for loop
+    percentiles_per_epoch = pd.DataFrame(columns = ("epoch", "percentile", "value"))
+
+    # epoch for loop
+    for epoch in epochs_to_train:
 
         loss_per_epoch = 0
         start_time_epoch = time()
 
         # train an epoch
+        i = 0
         for inputs, labels in data_loader:
             # register inputs and labels with device
             inputs, labels = inputs.to(device), labels.to(device)
@@ -88,8 +99,11 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch, dat
             optimizer.zero_grad() # zero the gradients
             loss.backward() # conduct backpropagation
             optimizer.step() # update parameters
-            loss_per_epoch += loss.item()
-
+            loss_per_epoch += (BATCH_SIZE * loss.item()) if (i < (len(dataset) // BATCH_SIZE)) else ((len(dataset) % BATCH_SIZE) * loss.item())
+            i += 1
+        del i
+        
+        # calculate statistics
         end_time_epoch = time()
 
         # calculate "accuracy" statistic
@@ -100,9 +114,13 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch, dat
             predictions = model(inputs).view(n_predictions, 1) # make prdictions, reshape to match the targets tensor from dataset.sample
         model.train() # turn off eval mode, back to train mode
         error = torch.mean(input = torch.abs(input = predictions - targets)).item()
-        del inputs, predictions, targets
+        percentiles = range(0, 101)
+        percentile_values = percentile(error, q = percentiles)
+        percentiles_per_epoch = pd.concat([percentiles_per_epoch, pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values})])
+        del inputs, predictions, targets, percentiles
 
-        # update losses list
+        # calculate loss per epoch, update losses list
+        loss_per_epoch = loss_per_epoch / len(dataset)
         losses.append(loss_per_epoch)
 
         # calculate time elapsed
@@ -121,15 +139,39 @@ def train(model, data_loader, loss_function, optimizer, device, start_epoch, dat
         print(f"EPOCH {epoch + 1}")
         print(f"Loss: {loss_per_epoch:.5f}")
         print(f"Average Error: {error:.3f}")
+        print(f"Five Number Summary: {' '.join((f'{i:.2f}' for i in (percentile_values[j] for j in (0, 25, 50, 75, 100))))}")
         print(f"Time: {(total_time_epoch / 60):.1f} minutes")
+        del loss_per_epoch, error, percentile_values, total_time_epoch
         print("----------------------------------------------------------------")
 
-    # plot loss as a function of iterations
-    plt.plot([epoch + 1 for epoch in epochs_to_train], losses, "-b")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.title("Learning Curve")
-    plt.savefig(join(dirname(NN_FILEPATH), "loss.png")) # save image
+    # plot loss and percentiles per epoch
+    fig, (loss_plot, percentiles_per_epoch_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (10, 7))
+    fig.suptitle("Tempo Neural Network")
+
+    # plot loss as a function of epoch
+    loss_plot.plot([epoch + 1 for epoch in epochs_to_train], losses, "-b")
+    loss_plot.set_xlabel("Epoch")
+    loss_plot.set_ylabel("Loss")
+    loss_plot.set_title("Learning Curve")
+
+    # plot percentiles plot over each epoch (final 3 epochs)
+    colors = ["b", "g", "r", "c", "m", "y", "k"] # length is same as n_epochs
+    n_epochs = min(3, len(colors))
+    colors = colors[:n_epochs]
+    percentiles_per_epoch = percentiles_per_epoch[percentiles_per_epoch["epoch"] > (max(percentiles_per_epoch["epoch"] - n_epochs))]
+    for i, epoch in enumerate(sorted(pd.unique(percentiles_per_epoch["epoch"]))):
+        percentile_at_epoch = percentiles_per_epoch[percentiles_per_epoch["epoch"] == epoch]
+        percentiles_per_epoch_plot.plot(percentile_at_epoch["percentile"], percentile_at_epoch["value"], "-" + colors[i], label = epoch)
+        del percentile_at_epoch
+    percentiles_per_epoch_plot.set_xlabel("Percentile")
+    percentiles_per_epoch_plot.set_ylabel("Difference")
+    percentiles_per_epoch_plot.legend(title = "Epoch", loc = "upper left")
+    percentiles_per_epoch_plot.set_title("Train Data Percentiles")
+
+    # save figure
+    fig.savefig(NN_FILEPATH.split(".")[0] + ".png", dpi = 180) # save image
+
+    del losses, percentiles_per_epoch, loss_plot, percentiles_per_epoch_plot, n_epochs, colors
     
 ##################################################
 
@@ -156,7 +198,6 @@ if __name__ == "__main__":
                                target_sample_rate = SAMPLE_RATE,
                                sample_duration = SAMPLE_DURATION,
                                device = device,
-                               transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64),
                                use_pseudo_replicates = True
                                )
 
@@ -172,9 +213,7 @@ if __name__ == "__main__":
     summary(model = tempo_nn, input_size = tempo_data[0][0].shape) # input_size = (# of channels, # of mels [frequency axis], time axis)
     print("================================================================")
 
-    # instantiate data loader, loss function, and optimizer
-    data_loader = DataLoader(tempo_data, batch_size = BATCH_SIZE)
-    loss_function = nn.MSELoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more)
+    # instantiate optimizer
     optimizer = torch.optim.Adam(tempo_nn.parameters(), lr = LEARNING_RATE)
 
     # load previously trained info if applicable
@@ -187,7 +226,7 @@ if __name__ == "__main__":
 
     # train
     start_time = time()
-    train(model = tempo_nn, data_loader = data_loader, loss_function = loss_function, optimizer = optimizer, device = device, start_epoch = start_epoch, dataset = tempo_data)
+    train(model = tempo_nn, dataset = tempo_data, optimizer = optimizer, device = device, start_epoch = start_epoch)
     end_time = time()
     print("================================================================")
     print("Training is done.")

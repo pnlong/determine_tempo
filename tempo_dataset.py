@@ -37,7 +37,7 @@ SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-vali
 
 class tempo_dataset(Dataset):
 
-    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, transformation, use_pseudo_replicates = True):
+    def __init__(self, labels_filepath, set_type, target_sample_rate, sample_duration, device, use_pseudo_replicates = True):
         # set_type can take on one of three values: ("train", "validation", "test")
 
         # import labelled data file, preprocess
@@ -57,8 +57,8 @@ class tempo_dataset(Dataset):
         self.sample_duration = sample_duration
         self.device = device
 
-        # import torch audio transformation(s)
-        self.transformation = transformation.to(self.device)
+        # import torch audio transformation(s), mel spectrogram transformation in this case
+        self.transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64).to(self.device)
 
     def __len__(self):
         return len(self.data)
@@ -77,11 +77,11 @@ class tempo_dataset(Dataset):
         # apply transformations
         signal = self.transformation(signal) # convert waveform to melspectrogram
 
-        return signal, torch.tensor([self.data.at[index, "tempo"]], dtype = torch.float) # returns the transformed signal and the actual BPM
+        return signal, torch.tensor([self.data.at[index, "tempo"]], dtype = torch.float32) # returns the transformed signal and the actual BPM
     
     # get info (title, artist, original filepath) of a file given its index; return as dictionary
     def get_info(self, index):
-        return self.data.loc[i, ["title", "artist", "key", "path_origin", "path"]].to_dict()
+        return self.data.loc[index, ["title", "artist", "key", "path_origin", "path"]].to_dict()
     
     # sample n_predictions random rows from data, return a tensor of the audios and a tensor of the labels
     def sample(self, n_predictions):
@@ -213,11 +213,8 @@ if __name__ == "__main__":
     # TEST DATASET OBJECT
     ##################################################
 
-    # instantiate mel spectrogram transformation
-    mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
-
     # instantiate tempo dataset
-    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device, transformation = mel_spectrogram)
+    tempo_data = tempo_dataset(labels_filepath = OUTPUT_FILEPATH, set_type = "", target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, device = device)
 
     # test len() functionality
     print(f"There are {len(tempo_data)} samples in the dataset.")

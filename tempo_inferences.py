@@ -46,8 +46,7 @@ tempo_data = tempo_dataset(labels_filepath = LABELS_FILEPATH,
                            set_type = "validate",
                            target_sample_rate = SAMPLE_RATE,
                            sample_duration = SAMPLE_DURATION,
-                           device = device,
-                           transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64)
+                           device = device
                            )
 
 # get a sample from the urban sound dataset for inference
@@ -68,22 +67,18 @@ for i in range(N_PREDICTIONS):
     print(f"Case {i + 1}: Predicted = {predictions[i].item():.2f}, Expected = {targets[i].item():.2f}, Difference = {error[i].item():.2f}")
 print("----------------------------------------------------------------")
 print(f"Average Error: {mean(error):.2f}")
-print(f"5% percentile: {percentile(error, q = 5):.2f}")
-print(f"10% percentile: {percentile(error, q = 10):.2f}")
-print(f"25% percentile: {percentile(error, q = 25):.2f}")
-print(f"50% percentile: {percentile(error, q = 50):.2f}")
-print(f"75% percentile: {percentile(error, q = 75):.2f}")
-print(f"90% percentile: {percentile(error, q = 90):.2f}")
-print(f"95% percentile: {percentile(error, q = 95):.2f}")
+
+# calculate percentiles
+percentiles = range(0, 101)
+percentile_values = percentile(error, q = percentiles)
+print("\n".join((f"{i}% percentile: {percentile_values[i]:.2f}" for i in (5, 10, 25, 50, 75, 90, 95))))
 
 # output percentile plot
-percentiles = range(0, 101)
-percentile_values = [float(percentile(error, q = i)) for i in percentiles]
 plt.plot(percentiles, percentile_values, "-b")
 plt.xlabel("Percentile")
 plt.ylabel("Difference")
 plt.title("Validation Data Percentiles")
-plt.savefig(join(dirname(NN_FILEPATH), "percentile.png")) # save image
+plt.savefig(join(dirname(NN_FILEPATH), "percentiles.validation.png")) # save image
 print("Outputting percentile plot...")
 
 ##################################################
