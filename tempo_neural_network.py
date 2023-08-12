@@ -30,7 +30,7 @@ from tempo_dataset import tempo_dataset # import dataset class
 ##################################################
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
-EPOCHS = int(sys.argv[3]) if len(sys.argv) == 4 else 10
+EPOCHS = int(sys.argv[3]) if len(sys.argv) == 4 else 3
 ##################################################
 
 
