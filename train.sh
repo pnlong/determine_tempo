@@ -20,7 +20,7 @@ data="${artificial_dj}/data"
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
 
 # set number of epochs
-epochs=""
+epochs="default"
 while getopts ":e:" opt
 do
     case $opt in
@@ -29,6 +29,7 @@ do
            exit 1;;
     esac
 done
+echo "EPOCHS: ${epochs}"
 
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
