@@ -30,12 +30,10 @@ from tempo_dataset import tempo_dataset # import dataset class
 ##################################################
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
-EPOCHS = 10
-if len(sys.argv) == 4:
-    try:
-        EPOCHS = int(sys.argv[3])
-    except:
-        pass
+try:
+    EPOCHS = max(0, int(sys.argv[3])) # in case of a negative number
+except (IndexError, ValueError): # in case there is no epochs argument or there is a non-int string
+    EPOCHS = 10
 ##################################################
 
 
