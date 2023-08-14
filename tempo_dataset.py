@@ -86,10 +86,10 @@ class tempo_dataset(Dataset):
     # sample n_predictions random rows from data, return a tensor of the audios and a tensor of the labels
     def sample(self, n_predictions):
         inputs_targets = [self.__getitem__(index = i) for i in self.data.sample(n = n_predictions, replace = False, ignore_index = False).index]
-        inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
-        targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1)
+        inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0).to(self.device) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
+        targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1).to(self.device) # note that I register the inputs and targets tensors to whatever device we are using
         del inputs_targets
-        return inputs.to(self.device), targets.to(self.device) # make sure to register the inputs and targets tensors to whatever device we are using
+        return inputs, targets
 
 ##################################################
 

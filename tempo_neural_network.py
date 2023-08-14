@@ -19,7 +19,7 @@ from torchsummary import summary
 from torch.utils.data import DataLoader
 import pandas as pd
 import matplotlib.pyplot as plt
-from numpy import percentile
+from numpy import percentile, mean
 from tempo_dataset import tempo_dataset # import dataset class
 # sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
 # sys.argv = ("./tempo_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth", "")
@@ -118,12 +118,11 @@ def train(model, dataset, optimizer, device, start_epoch):
         with torch.no_grad():
             predictions = model(inputs).view(n_predictions, 1) # make prdictions, reshape to match the targets tensor from dataset.sample
         model.train() # turn off eval mode, back to train mode
-        error = torch.abs(input = predictions - targets)
+        error = torch.abs(input = predictions - targets).numpy()
         percentiles = range(0, 101)
-        percentile_values = percentile(error.numpy(), q = percentiles)
+        percentile_values = percentile(error, q = percentiles)
         percentiles_per_epoch = pd.concat([percentiles_per_epoch, pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values})])
         del inputs, predictions, targets, percentiles
-        error = torch.mean(input = error).item()
 
         # calculate loss per epoch, update losses list
         loss_per_epoch = loss_per_epoch / len(dataset)
@@ -144,7 +143,7 @@ def train(model, dataset, optimizer, device, start_epoch):
         # print out updates
         print(f"EPOCH {epoch + 1}")
         print(f"Loss: {loss_per_epoch:.3f}")
-        print(f"Average Error: {error:.3f}")
+        print(f"Average Error: {mean(error):.3f}")
         print(f"Five Number Summary: {' '.join((f'{i:.2f}' for i in (percentile_values[j] for j in (0, 25, 50, 75, 100))))}")
         print(f"Time: {(total_time_epoch / 60):.1f} minutes")
         del loss_per_epoch, error, percentile_values, total_time_epoch
