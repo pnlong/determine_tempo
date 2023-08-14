@@ -75,8 +75,10 @@ The rest of the arguments are the same as for `tempo_neural_network.py`. See abo
 Runs `tempo_neural_network.py` on a cluster. Assumes `tempo_dataset.py` has already been run.
 
 ```
-sbatch ./train.sh
+sbatch ./train.sh -e <e>
 ```
+
+- `-e` is the number of epochs on which to train the neural network.
 
 
 ### *gunzip_tempo_data.sh*

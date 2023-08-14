@@ -89,7 +89,7 @@ class tempo_dataset(Dataset):
         inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
         targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1)
         del inputs_targets
-        return inputs, targets
+        return inputs.to(self.device), targets.to(self.device) # make sure to register the inputs and targets tensors to whatever device we are using
 
 ##################################################
 

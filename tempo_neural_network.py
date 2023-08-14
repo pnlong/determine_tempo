@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from numpy import percentile
 from tempo_dataset import tempo_dataset # import dataset class
 # sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
-# sys.argv = ("./tempo_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth")
+# sys.argv = ("./tempo_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth", "")
 ##################################################
 
 
@@ -30,7 +30,12 @@ from tempo_dataset import tempo_dataset # import dataset class
 ##################################################
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-3
-EPOCHS = int(sys.argv[3]) if len(sys.argv) == 4 else 3
+EPOCHS = 10
+if len(sys.argv) == 4:
+    try:
+        EPOCHS = int(sys.argv[3])
+    except:
+        pass
 ##################################################
 
 
@@ -115,7 +120,7 @@ def train(model, dataset, optimizer, device, start_epoch):
         model.train() # turn off eval mode, back to train mode
         error = torch.abs(input = predictions - targets)
         percentiles = range(0, 101)
-        percentile_values = percentile(error, q = percentiles)
+        percentile_values = percentile(error.numpy(), q = percentiles)
         percentiles_per_epoch = pd.concat([percentiles_per_epoch, pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values})])
         del inputs, predictions, targets, percentiles
         error = torch.mean(input = error).item()

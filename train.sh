@@ -6,7 +6,6 @@
 #SBATCH --ntasks=1                      ## request 1 task
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
 #SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
-#SBATCH --error=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train.err            ## error log file
 #SBATCH --output=/dfs7/adl/pnlong/artificial_dj/determine_tempo/train.out           ## output log file
 
 # README
@@ -21,6 +20,17 @@ data="${artificial_dj}/data"
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
 
+# set number of epochs
+epochs=""
+while getopts ":e:" opt
+do
+    case $opt in
+        e) epochs=$OPTARG;;
+       \?) echo "ERROR: Invalid option: ${0} [-e <e>]"
+           exit 1;;
+    esac
+done
+
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
 
@@ -29,4 +39,4 @@ eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
 # run python script
-python "${artificial_dj}/determine_tempo/tempo_neural_network.py" "${data}/tempo_data.cluster.tsv" "${data}/tempo_nn.pth"
+python "${artificial_dj}/determine_tempo/tempo_neural_network.py" "${data}/tempo_data.cluster.tsv" "${data}/tempo_nn.pth" "${epochs}"
