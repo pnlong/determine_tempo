@@ -116,7 +116,7 @@ def train(model, dataset, optimizer, device, start_epoch):
         with torch.no_grad():
             predictions = model(inputs).view(n_predictions, 1) # make prdictions, reshape to match the targets tensor from dataset.sample
         model.train() # turn off eval mode, back to train mode
-        error = torch.abs(input = predictions - targets).numpy(force = True)
+        error = torch.abs(input = predictions - targets).numpy(force = True) # force error calculations into numpy array on CPU
         percentiles = range(0, 101)
         percentile_values = percentile(error, q = percentiles)
         percentiles_per_epoch = pd.concat([percentiles_per_epoch, pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values})])
