@@ -35,6 +35,7 @@ set_types = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-vali
 # TEMPO DATASET OBJECT CLASS
 ##################################################
 
+set_types_indicies_already_calculated = False
 class tempo_dataset(Dataset):
 
     def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
@@ -47,15 +48,18 @@ class tempo_dataset(Dataset):
         self.data = self.data[~pd.isna(self.data["tempo"])] # remove na values
         if not use_pseudo_replicates: # if no pseudo-replicates, transform self.data once more
             self.data = self.data.groupby(["title", "artist", "key", "path_origin"]).sample(n = 1, replace = False, random_state = 0, ignore_index = True) # randomly pick a sample from each song
+            self.data = self.data.reset_index(drop = True) # reset indicies
 
         # partition into the train, validation, or test dataset
         self.data = self.data.sample(frac = 1, replace = False, random_state = 0, ignore_index = True) # shuffle data
-        set_types[""] = range(0, len(self.data)) # convert set_types into ranges of values to extract
-        set_types["train"] = range(0, int(set_types["train"] * len(self.data)))
-        set_types["validation"] = range(set_types["train"].stop, set_types["train"].stop + int(set_types["validation"] * len(self.data)))
-        set_types["test"] = range(set_types["validation"].stop, len(self.data))
-        self.data = self.data.iloc[set_types["" if set_type not in set_types.keys() else set_type]] # extract range depending on set_type
-        self.data = self.data.reset_index(drop = True) # reset indicies also
+        global set_types_indicies_already_calculated # declare scope of set_types_indicies_already_calculated
+        if not set_types_indicies_already_calculated:
+            set_types["train"] = range(0, int(set_types["train"] * len(self.data))) # extraction indicies for training data
+            set_types["validation"] = range(set_types["train"].stop, set_types["train"].stop + int(set_types["validation"] * len(self.data))) # extraction indicies for validation data
+            set_types["test"] = range(set_types["validation"].stop, len(self.data)) # extraction indicies for test data
+            set_types[""] = range(0, len(self.data)) # convert set_types into ranges of values to extract
+            set_types_indicies_already_calculated = True # since ranges have been calculated, set this switch to True so they are not recalculated
+        self.data = self.data.iloc[set_types["" if set_type not in set_types.keys() else set_type]].reset_index(drop = True) # extract range depending on set_type, also reset indicies
         
         # import constants
         # self.target_sample_rate = target_sample_rate # not being used right now
