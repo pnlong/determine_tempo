@@ -47,12 +47,12 @@ class tempo_nn(torch.nn.Module):
 
         # initialize pretrained model from pytorch, setting pretrained to True
         self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
-        # freeze model parameters
+        # freeze model parameters (since the model is already trained, we don't want to retrain them)
         for parameter in self.model.parameters():
             parameter.requires_grad = False
         # change the final layer of the model to match my problem, change depending on the transfer learning model being used
         self.model.classifier[6] = torch.nn.Linear(in_features = 4096, out_features = 1)
-        # self.model.classifier.add_module("7", torch.nn.LogSoftmax(dim = 1)) # add softmax layer if necessary
+        # self.model.classifier.add_module("7", torch.nn.LogSoftmax(dim = 1)) # to add layers
 
         # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
         # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
@@ -67,6 +67,7 @@ class tempo_nn(torch.nn.Module):
     def forward(self, input_data):
 
         output = self.model(input_data)
+        return output
 
         # x = self.conv1(input_data)
         # x = self.conv2(x)
@@ -76,8 +77,7 @@ class tempo_nn(torch.nn.Module):
         # x = self.linear1(x)
         # x = self.linear2(x)
         # output = self.output(x)
-
-        return output
+        # return output
 
 ##################################################
 

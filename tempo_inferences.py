@@ -74,7 +74,7 @@ print(f"Average Error: {torch.mean(input = error).item():.2f}")
 
 # calculate percentiles
 percentiles = range(0, 101)
-percentile_values = percentile(error.numpy(), q = percentiles)
+percentile_values = percentile(error.numpy(force = True), q = percentiles)
 print(f"Minimum Error: {percentile_values[0]:.2f}")
 print(*(f"{i}% Percentile: {percentile_values[i]:.2f}" for i in (5, 10, 25, 50, 75, 90, 95)), sep = "\n")
 print(f"Maximum Error: {percentile_values[100]:.2f}")

@@ -20,6 +20,7 @@ from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import torchvision.transforms
 import pandas as pd
+from numpy import repeat
 # sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Volumes/Seagate/artificial_dj_data/tempo_data")
 ##################################################
 
@@ -82,17 +83,24 @@ class tempo_dataset(Dataset):
 
         # resample; sample_rate was already set in preprocessing
         # signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = self.target_sample_rate, device = self.device) # resample for consistent sample rate
+        
         # convert from stereo to mono; already done in preprocessing
         # signal = _mix_down_if_necessary(signal = signal)
+
         # pad/crop for fixed signal duration; duration was already set in preprocessing
         # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
 
         # convert waveform to melspectrogram
-        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64).to(self.device)
-        signal = mel_spectrogram(signal)
+        n_fft = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // 224) # 224 is the minimum image width for PyTorch image processing
+        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = n_fft, n_mels = 256).to(self.device) # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / (n_fft)) > 224
+        signal = mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
 
-        # torchvision transformations
+        # convert from 1 channel to 3 channels (mono -> RGB); I will treat this as an image classification problem
+        signal = repeat(a = signal, repeats = 3, axis = 0) # (3 channels, # of mels, # of time samples) = (3, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
 
+        # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
+        normalize = torchvision.transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]).to(self.device)
+        signal = normalize(signal)
 
         return signal
     
