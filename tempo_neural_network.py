@@ -14,6 +14,7 @@
 import sys
 from time import time
 from os.path import exists
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from torchvision.models import resnet50, ResNet50_Weights
@@ -51,8 +52,9 @@ class tempo_nn(torch.nn.Module):
         for parameter in self.model.parameters():
             parameter.requires_grad = False
         # change the final layer of the model to match my problem, change depending on the transfer learning model being used
-        self.model.classifier[6] = torch.nn.Linear(in_features = 4096, out_features = 1)
-        # self.model.classifier.add_module("7", torch.nn.LogSoftmax(dim = 1)) # to add layers
+        self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000),
+                                            torch.nn.Linear(in_features = 1000, out_features = 1) # one output feature = one predicted value
+                                            )
 
         # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
         # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
@@ -166,7 +168,7 @@ if __name__ == "__main__":
         start_time_epoch = time()
 
         # training loop
-        for inputs, labels in data_loader["train"]:
+        for inputs, labels in tqdm(data_loader["train"], desc = f"Training Epoch {epoch + 1}"):
 
             # register inputs and labels with device
             inputs, labels = inputs.to(device), labels.to(device)
