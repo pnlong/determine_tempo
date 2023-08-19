@@ -14,7 +14,6 @@
 import sys
 from time import time
 from os.path import exists
-from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from torchvision.models import resnet50, ResNet50_Weights
@@ -168,7 +167,7 @@ if __name__ == "__main__":
         start_time_epoch = time()
 
         # training loop
-        for inputs, labels in tqdm(data_loader["train"], desc = f"Training Epoch {epoch + 1}"):
+        for inputs, labels in data_loader["train"]:
 
             # register inputs and labels with device
             inputs, labels = inputs.to(device), labels.to(device)
@@ -319,7 +318,7 @@ if __name__ == "__main__":
     percentiles_history_plot.set_title("Validation Data Percentiles")
 
     # save figure
-    fig.savefig(NN_FILEPATH.split(".")[0] + ".png", dpi = 180) # save image
+    fig.savefig(".".join(NN_FILEPATH.split(".")[:-1]) + ".png", dpi = 180) # save image
 
     ##################################################
     
