@@ -18,6 +18,7 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
+import torchvision.transforms
 import pandas as pd
 # sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Volumes/Seagate/artificial_dj_data/tempo_data")
 ##################################################
@@ -28,14 +29,13 @@ import pandas as pd
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 10.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between the start of each .wav file
-set_types = {"train": 0.7, "validation": 0.2, "test": 0.1, "": 1.0} # train-validation-test fractions
+SET_TYPES = {"train": 0.7, "validation": 0.2, "test": 0.1} # train-validation-test fractions
 ##################################################
 
 
 # TEMPO DATASET OBJECT CLASS
 ##################################################
 
-set_types_indicies_already_calculated = False
 class tempo_dataset(Dataset):
 
     def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
@@ -52,22 +52,13 @@ class tempo_dataset(Dataset):
 
         # partition into the train, validation, or test dataset
         self.data = self.data.sample(frac = 1, replace = False, random_state = 0, ignore_index = True) # shuffle data
-        global set_types_indicies_already_calculated # declare scope of set_types_indicies_already_calculated
-        if not set_types_indicies_already_calculated:
-            set_types["train"] = range(0, int(set_types["train"] * len(self.data))) # extraction indicies for training data
-            set_types["validation"] = range(set_types["train"].stop, set_types["train"].stop + int(set_types["validation"] * len(self.data))) # extraction indicies for validation data
-            set_types["test"] = range(set_types["validation"].stop, len(self.data)) # extraction indicies for test data
-            set_types[""] = range(0, len(self.data)) # convert set_types into ranges of values to extract
-            set_types_indicies_already_calculated = True # since ranges have been calculated, set this switch to True so they are not recalculated
-        self.data = self.data.iloc[set_types["" if set_type not in set_types.keys() else set_type]].reset_index(drop = True) # extract range depending on set_type, also reset indicies
+        set_type = "" if set_type not in SET_TYPES.keys() else set_type
+        self.data = self.data.iloc[_partition(n = len(self.data))[set_type]].reset_index(drop = True) # extract range depending on set_type, also reset indicies
         
         # import constants
         # self.target_sample_rate = target_sample_rate # not being used right now
         # self.sample_duration = sample_duration # not being used right now
         self.device = device
-
-        # import torch audio transformation(s), mel spectrogram transformation in this case
-        self.transformation = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64).to(self.device)
 
     def __len__(self):
         return len(self.data)
@@ -77,34 +68,55 @@ class tempo_dataset(Dataset):
         signal, sample_rate = torchaudio.load(self.data.at[index, "path"], format = "wav") # returns the waveform data and sample rate
         # register signal onto device (gpu [cuda] or cpu)
         signal = signal.to(self.device)
+        # apply transformations
+        signal = self._transform(signal = signal)
+        # return the transformed signal and the actual BPM
+        return signal, torch.tensor([self.data.at[index, "tempo"]], dtype = torch.float32)
+    
+    # get info (title, artist, original filepath) of a file given its index; return as dictionary
+    def get_info(self, index):
+        return self.data.loc[index, ["title", "artist", "path_origin", "path", "tempo", "key"]].to_dict()
+    
+    # transform a waveform into whatever will be used to train a neural network
+    def _transform(self, signal):
+
         # resample; sample_rate was already set in preprocessing
         # signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = self.target_sample_rate, device = self.device) # resample for consistent sample rate
         # convert from stereo to mono; already done in preprocessing
         # signal = _mix_down_if_necessary(signal = signal)
         # pad/crop for fixed signal duration; duration was already set in preprocessing
         # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
-        # apply transformations
-        signal = self.transformation(signal) # convert waveform to melspectrogram
 
-        return signal, torch.tensor([self.data.at[index, "tempo"]], dtype = torch.float32) # returns the transformed signal and the actual BPM
-    
-    # get info (title, artist, original filepath) of a file given its index; return as dictionary
-    def get_info(self, index):
-        return self.data.loc[index, ["title", "artist", "path_origin", "path", "tempo", "key"]].to_dict()
+        # convert waveform to melspectrogram
+        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = 1024, hop_length = 1024 // 2, n_mels = 64).to(self.device)
+        signal = mel_spectrogram(signal)
+
+        # torchvision transformations
+
+
+        return signal
     
     # sample n_predictions random rows from data, return a tensor of the audios and a tensor of the labels
-    def sample(self, n_predictions):
-        inputs_targets = [self.__getitem__(index = i) for i in self.data.sample(n = n_predictions, replace = False, ignore_index = False).index]
-        inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0).to(self.device) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
-        targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1).to(self.device) # note that I register the inputs and targets tensors to whatever device we are using
-        del inputs_targets
-        return inputs, targets
+    # def sample(self, n_predictions):
+    #     inputs_targets = [self.__getitem__(index = i) for i in self.data.sample(n = n_predictions, replace = False, ignore_index = False).index]
+    #     inputs = torch.cat([torch.unsqueeze(input = input_target[0], dim = 0) for input_target in inputs_targets], dim = 0).to(self.device) # tempo_nn expects (batch_size, num_channels, frequency, time) [4-dimensions], so we add the batch size dimension here with unsqueeze()
+    #     targets = torch.cat([input_target[1] for input_target in inputs_targets], dim = 0).view(n_predictions, 1).to(self.device) # note that I register the inputs and targets tensors to whatever device we are using
+    #     del inputs_targets
+    #     return inputs, targets
 
 ##################################################
 
 
 # HELPER FUNCTIONS
 ##################################################
+
+# partition dataset into training, validation, and test sets
+def _partition(n, set_types = SET_TYPES):
+    set_types_values = [int(i.item()) for i in (torch.cumsum(input = torch.Tensor([0,] + list(set_types.values())), dim = 0) * n)] # get indicies for start of each new dataset type
+    set_types_values = [range(set_types_values[i - 1], set_types_values[i]) for i in range(1, len(set_types_values))] # create ranges from previously created indicies
+    set_types = dict(zip(set_types.keys(), set_types_values)) # create new set types dictionary
+    set_types[""] = range(n) # create instance where no set type is named, so return all values
+    return set_types
 
 # resampler
 def _resample_if_necessary(signal, sample_rate, new_sample_rate, device):

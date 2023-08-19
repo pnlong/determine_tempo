@@ -6,7 +6,7 @@
 # Given an audio file as input, it outputs a single number representing the song's tempo in Beats per Minute (BPM).
 
 # python ./tempo_neural_network.py labels_filepath nn_filepath epochs
-# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_tempo/tempo_neural_network.py  "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth" "1"
+# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_tempo/tempo_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth" "1"
 
 
 # IMPORTS
@@ -15,10 +15,9 @@ import sys
 from time import time
 from os.path import exists
 import torch
-from torch import nn
-from torchvision import models
-from torchsummary import summary
 from torch.utils.data import DataLoader
+from torchvision.models import resnet50, ResNet50_Weights
+from torchsummary import summary
 import pandas as pd
 import matplotlib.pyplot as plt
 from numpy import percentile
@@ -41,29 +40,43 @@ except (IndexError, ValueError): # in case there is no epochs argument or there 
 
 # NEURAL NETWORK CLASS
 ##################################################
-class tempo_nn(nn.Module):
+class tempo_nn(torch.nn.Module):
 
     def __init__(self):
         super().__init__()
+
+        # initialize pretrained model from pytorch, setting pretrained to True
+        self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
+        # freeze model parameters
+        for parameter in self.model.parameters():
+            parameter.requires_grad = False
+        # change the final layer of the model to match my problem, change depending on the transfer learning model being used
+        self.model.classifier[6] = torch.nn.Linear(in_features = 4096, out_features = 1)
+        # self.model.classifier.add_module("7", torch.nn.LogSoftmax(dim = 1)) # add softmax layer if necessary
+
         # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
-        self.conv1 = nn.Sequential(nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), nn.ReLU(), nn.MaxPool2d(kernel_size = 2))
-        self.conv2 = nn.Sequential(nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 2), nn.ReLU(), nn.MaxPool2d(kernel_size = 2))
-        self.conv3 = nn.Sequential(nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 2), nn.ReLU(), nn.MaxPool2d(kernel_size = 2))
-        self.conv4 = nn.Sequential(nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 2), nn.ReLU(), nn.MaxPool2d(kernel_size = 2))
-        self.flatten = nn.Flatten(start_dim = 1)
-        self.linear1 = nn.Linear(in_features = 17920, out_features = 100)
-        self.linear2 = nn.Linear(in_features = 100, out_features = 10)
-        self.output = nn.Linear(in_features = 10, out_features = 1)
+        # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+        # self.conv2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+        # self.conv3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+        # self.conv4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+        # self.flatten = torch.nn.Flatten(start_dim = 1)
+        # self.linear1 = torch.nn.Linear(in_features = 17920, out_features = 100)
+        # self.linear2 = torch.nn.Linear(in_features = 100, out_features = 10)
+        # self.output = torch.nn.Linear(in_features = 10, out_features = 1)
 
     def forward(self, input_data):
-        x = self.conv1(input_data)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        x = self.flatten(x)
-        x = self.linear1(x)
-        x = self.linear2(x)
-        output = self.output(x)
+
+        output = self.model(input_data)
+
+        # x = self.conv1(input_data)
+        # x = self.conv2(x)
+        # x = self.conv3(x)
+        # x = self.conv4(x)
+        # x = self.flatten(x)
+        # x = self.linear1(x)
+        # x = self.linear2(x)
+        # output = self.output(x)
+
         return output
 
 ##################################################
@@ -108,7 +121,7 @@ if __name__ == "__main__":
     print("================================================================")
 
     # instantiate loss function and optimizer
-    loss_criterion = nn.MSELoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
+    loss_criterion = torch.nn.MSELoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
     optimizer = torch.optim.Adam(tempo_nn.parameters()) # if I am not using a pretrained model, I need to specify lr = LEARNING_RATE
 
     # load previously trained info if applicable
@@ -127,7 +140,7 @@ if __name__ == "__main__":
         "validate_loss": [0.0,] * len(epochs_to_train),
         "validate_accuracy": [0.0,] * len(epochs_to_train)
         }
-    best_accuracy = 1e+24 # make sure to reset for different accuracy metrics
+    best_accuracy = 1e+24 # make sure to adjust for different accuracy metrics
     percentiles_history = pd.DataFrame(columns = ("epoch", "percentile", "value"))
 
     # mark when I started training
@@ -174,7 +187,7 @@ if __name__ == "__main__":
             optimizer.step()
 
             # compute the total loss for the batch and add it to loss["train"]
-            loss["train"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch
+            loss["train"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
             # compute the accuracy
             accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
@@ -213,7 +226,7 @@ if __name__ == "__main__":
                 loss_batch = loss_criterion(predictions, labels)
 
                 # compute the total loss for the batch and add it to loss["validate"]
-                loss["validate"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch
+                loss["validate"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
                 # compute the accuracy
                 accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
@@ -253,9 +266,9 @@ if __name__ == "__main__":
             torch.save(checkpoint, NN_FILEPATH)
 
         # print out updates
-        print(f"Time: {(total_time_epoch / 60):.1f} minutes")
+        print(f"Training Time: {(total_time_epoch / 60):.1f} minutes")
         print(f"Training Loss: {loss['train']:.3f}, Validation Loss: {loss['validate']:.3f}")
-        print(f"Mean Training Accuracy: {accuracy['train']:.3f}, Mean Validation Accuracy: {accuracy['validate']:.3f}")
+        print(f"Mean Training Error: {accuracy['train']:.3f}, Mean Validation Error: {accuracy['validate']:.3f}")
         print(f"Five Number Summary of Validation Errors: {' '.join((f'{value:.2f}' for value in (percentile_values[percentile] for percentile in (0, 25, 50, 75, 100))))}")
         print("----------------------------------------------------------------")
 

@@ -61,12 +61,10 @@ python ./tempo_neural_network.py labels_filepath nn_filepath epochs
 Tests the accuracy of the neural network trained in `tempo_neural_network.py`.
 
 ```
-python ./tempo_inference.py labels_filepath nn_filepath n_predictions
+python ./tempo_inference.py labels_filepath nn_filepath
 ```
 
-- `n_predictions` is the number of samples that the neural network should predict.
-
-The rest of the arguments are the same as for `tempo_neural_network.py`. See above.
+The arguments are the same as for `tempo_neural_network.py`. See above.
 
 ---
 
