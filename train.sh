@@ -7,6 +7,9 @@
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
 #SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
 
+module load cuda/11.0
+echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
+
 # README
 # Phillip Long
 # August 4, 2023
