@@ -222,7 +222,7 @@ if __name__ == "__main__":
             tempo_nn.eval()
 
             # validation loop
-            error_validate = torch.Tensor()
+            error_validate = torch.Tensor().to(device)
             for inputs, labels in data_loader["validate"]:
 
                 # register inputs and labels with device
@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
         # calculate percentiles
         percentiles = range(0, 101)
-        percentile_values = percentile(error_validate, q = percentiles)
+        percentile_values = percentile(error_validate.numpy(force = True), q = percentiles)
         percentiles_history = pd.concat([percentiles_history, pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values})])
 
         # save current model if its validation accuracy is the best so far
