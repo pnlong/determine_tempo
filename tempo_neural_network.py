@@ -42,18 +42,27 @@ except (IndexError, ValueError): # in case there is no epochs argument or there 
 ##################################################
 class tempo_nn(torch.nn.Module):
 
-    def __init__(self):
+    def __init__(self, nn_filepath, device):
         super().__init__()
 
         # initialize pretrained model from pytorch, setting pretrained to True
         self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
-        # freeze model parameters (since the model is already trained, we don't want to retrain them)
-        for parameter in self.model.parameters():
-            parameter.requires_grad = False
+
         # change the final layer of the model to match my problem, change depending on the transfer learning model being used
         self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000),
                                             torch.nn.Linear(in_features = 1000, out_features = 1) # one output feature = one predicted value
                                             )
+
+        # try to load previously saved parameters
+        if exists(nn_filepath):
+            checkpoint = torch.load(nn_filepath, map_location = device)
+            self.model.load_state_dict(checkpoint["state_dict"])
+
+        # freeze model parameters (since the model is already trained, we don't want to retrain them) except for the final layer
+        for parameter in self.model.parameters():
+            parameter.requires_grad = False
+        for parameter in self.model.fc.parameters():
+            parameter.requires_grad = True
 
         # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
         # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
@@ -110,7 +119,7 @@ if __name__ == "__main__":
     }
 
     # construct model and assign it to device, also summarize 
-    tempo_nn = tempo_nn().to(device)
+    tempo_nn = tempo_nn(nn_filepath = NN_FILEPATH, device = device).to(device)
     if device == "cuda": # some memory usage statistics
         print(f"Device Name: {torch.cuda.get_device_name(0)}")
         print("Memory Usage:")
@@ -129,7 +138,6 @@ if __name__ == "__main__":
     start_epoch = 0
     if exists(NN_FILEPATH):
         checkpoint = torch.load(NN_FILEPATH, map_location = device)
-        tempo_nn.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         start_epoch = int(checkpoint["epoch"]) + 1    
 

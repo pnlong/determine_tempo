@@ -39,9 +39,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Device: {device.upper()}")
 
 # load back the model
-tempo_nn = tempo_nn().to(device)
-state_dict = torch.load(NN_FILEPATH, map_location = device)
-tempo_nn.load_state_dict(state_dict["state_dict"])
+tempo_nn = tempo_nn(nn_filepath = NN_FILEPATH, device = device).to(device)
 print("Imported neural network parameters.")
 
 # instantiate our dataset object and data loader
