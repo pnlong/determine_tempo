@@ -288,7 +288,7 @@ if __name__ == "__main__":
     ##################################################
 
     # plot loss and percentiles per epoch
-    fig, (loss_plot, percentiles_history_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (2, 1))
+    fig, (loss_plot, percentiles_history_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (12, 6))
     fig.suptitle("Tempo Neural Network")
     colors = ["b", "r", "g", "c", "m", "y", "k"]
 
