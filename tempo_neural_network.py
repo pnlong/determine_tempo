@@ -56,7 +56,7 @@ class tempo_nn(torch.nn.Module):
         # try to load previously saved parameters
         if exists(nn_filepath):
             checkpoint = torch.load(nn_filepath, map_location = device)
-            self.model.load_state_dict(checkpoint["state_dict"])
+            self.model.load_state_dict(checkpoint["state_dict"], strict = False)
 
         # freeze model parameters (since the model is already trained, we don't want to retrain them) except for the final layer
         for parameter in self.model.parameters():
