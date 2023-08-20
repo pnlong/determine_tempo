@@ -83,7 +83,7 @@ plt.plot(percentiles, percentile_values, color = "b", linestyle = "-")
 plt.xlabel("Percentile")
 plt.ylabel("Error")
 plt.title("Test Data Percentiles")
-plt.savefig(join(dirname(NN_FILEPATH), "percentiles.test.png")) # save image
+plt.savefig(".".join(NN_FILEPATH.split(".")[:-1]) + ".test.png") # save image
 print("Outputting percentile plot...")
 
 ##################################################
