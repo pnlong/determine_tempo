@@ -7,8 +7,7 @@
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
 #SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
 
-module load cuda/11.7.1
-echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
+echo "JOB ID: ${SLURM_JOBID}"
 
 # README
 # Phillip Long

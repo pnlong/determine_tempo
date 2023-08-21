@@ -89,6 +89,11 @@ class tempo_nn(torch.nn.Module):
         # output = self.output(x)
         # return output
 
+    # flip the requires_grad value for all of the model's parameters, so that I can fine tune either the pretrained or my specific section without affecting the other
+    def flip_requires_grad(self):
+        for parameter in self.model.parameters():
+            parameter.requires_grad = not (parameter.requires_grad)
+
 ##################################################
 
 
@@ -98,6 +103,7 @@ if __name__ == "__main__":
     ##################################################
     LABELS_FILEPATH = sys.argv[1]
     NN_FILEPATH = sys.argv[2]
+    OUTPUT_PREFIX = ".".join(NN_FILEPATH.split(".")[:-1])
     ##################################################
 
     # PREPARE TO TRAIN NEURAL NETWORK
@@ -141,16 +147,21 @@ if __name__ == "__main__":
         optimizer.load_state_dict(checkpoint["optimizer"])
         start_epoch = int(checkpoint["epoch"]) + 1    
 
-    # tracking statistics
-    epochs_to_train = range(start_epoch, start_epoch + EPOCHS)
-    history = {
-        "train_loss": [0.0,] * len(epochs_to_train),
-        "train_accuracy": [0.0,] * len(epochs_to_train),
-        "validate_loss": [0.0,] * len(epochs_to_train),
-        "validate_accuracy": [0.0,] * len(epochs_to_train)
-        }
+    # STARTING BEST ACCURACY, ADJUST IF NEEDED
     best_accuracy = 1e+24 # make sure to adjust for different accuracy metrics
-    percentiles_history = pd.DataFrame(columns = ("epoch", "percentile", "value"))
+
+    # history of losses and accuracy
+    history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy")
+    output_filepath_history = OUTPUT_PREFIX + ".history.tsv"
+    pd.DataFrame(columns = history_columns).to_csv(output_filepath_history, sep = "\t", header = True, index = False, mode = "w") # write column names
+
+    # history of percentiles in validation data
+    percentiles_history_columns = ("epoch", "percentile", "value")
+    output_filepath_percentiles_history = OUTPUT_PREFIX + ".percentiles_history.tsv"
+    pd.DataFrame(columns = percentiles_history_columns).to_csv(output_filepath_percentiles_history, sep = "\t", header = True, index = False, mode = "w") # write column names
+    
+    # percentiles for percentiles plots; define here since it doesn't need to be redefined every epoch
+    percentiles = range(0, 101)
 
     # mark when I started training
     start_time = time()
@@ -158,10 +169,9 @@ if __name__ == "__main__":
     ##################################################
 
 
-    # EPOCH FOR LOOP
-    for i, epoch in enumerate(epochs_to_train):
-
-        print(f"EPOCH {epoch + 1} / {epochs_to_train.stop}")
+    # FUNCTION FOR TRAINING AN EPOCH
+    ##################################################
+    def train_an_epoch(epoch):
 
         # TRAIN AN EPOCH
         ##################################################
@@ -170,8 +180,8 @@ if __name__ == "__main__":
         tempo_nn.train()
 
         # instantiate some stats values
-        loss = {"train": 0.0, "validate": 0.0}
-        accuracy = {"train": 0.0, "validate": 0.0} # in the case of linear regression, accuracy is actually the average absolute error
+        history_epoch = dict(zip(history_columns, (0.0,) * len(history_columns))) # in the case of linear regression, accuracy is actually the average absolute error
+        history_epoch["epoch"] = epoch + 1
         start_time_epoch = time()
 
         # training loop
@@ -195,14 +205,14 @@ if __name__ == "__main__":
             # update the parameters
             optimizer.step()
 
-            # compute the total loss for the batch and add it to loss["train"]
-            loss["train"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
+            # compute the total loss for the batch and add it to history_epoch["train_loss"]
+            history_epoch["train_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
             # compute the accuracy
             accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
 
-            # compute the total accuracy for the batch and add it to accuracy["train"]
-            accuracy["train"] += torch.sum(input = accuracy_batch).item()
+            # compute the total accuracy for the batch and add it to history_epoch["train_accuracy"]
+            history_epoch["train_accuracy"] += torch.sum(input = accuracy_batch).item()
         
         # for calculating time statistics
         end_time_epoch = time()
@@ -234,14 +244,14 @@ if __name__ == "__main__":
                 # compute loss
                 loss_batch = loss_criterion(predictions, labels)
 
-                # compute the total loss for the batch and add it to loss["validate"]
-                loss["validate"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
+                # compute the total loss for the batch and add it to history_epoch["validate_loss"]
+                history_epoch["validate_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
                 # compute the accuracy
                 accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
 
-                # compute the total accuracy for the batch and add it to accuracy["validate"]
-                accuracy["validate"] += torch.sum(input = accuracy_batch).item()
+                # compute the total accuracy for the batch and add it to history_epoch["validate_accuracy"]
+                history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
 
                 # add accuracy to running count of all the errors in the validation dataset
                 error_validate = torch.cat(tensors = (error_validate, accuracy_batch), dim = 0)
@@ -253,20 +263,21 @@ if __name__ == "__main__":
         ##################################################
 
         # compute average losses and accuracies
-        loss["train"] /= len(data["train"])
-        accuracy["train"] /= len(data["train"])
-        loss["validate"] /= len(data["validate"])
-        accuracy["validate"] /= len(data["validate"])
-        history["train_loss"][i], history["train_accuracy"][i], history["validate_loss"][i], history["validate_accuracy"][i] = loss["train"], accuracy["train"], loss["validate"], accuracy["validate"] # store average losses and accuracies in history
+        history_epoch["train_loss"] /= len(data["train"])
+        history_epoch["train_accuracy"] /= len(data["train"])
+        history_epoch["validate_loss"] /= len(data["validate"])
+        history_epoch["validate_accuracy"] /= len(data["validate"])
+        # store average losses and accuracies in history
+        pd.DataFrame(data = [history_epoch], columns = history_columns).to_csv(output_filepath_history, sep = "\t", header = False, index = False, mode = "a") # write to file
 
         # calculate percentiles
-        percentiles = range(0, 101)
         percentile_values = percentile(error_validate.numpy(force = True), q = percentiles)
-        percentiles_history = pd.concat([percentiles_history, pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values})])
+        pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values}, columns = percentiles_history_columns).to_csv(output_filepath_percentiles_history, sep = "\t", header = False, index = False, mode = "a") # write to file
 
         # save current model if its validation accuracy is the best so far
-        if accuracy["validate"] <= best_accuracy:
-            best_accuracy = accuracy["validate"] # update best_accuracy
+        global best_accuracy
+        if history_epoch["validate_accuracy"] <= best_accuracy:
+            best_accuracy = history_epoch["validate_accuracy"] # update best_accuracy
             checkpoint = {
                 "epoch": epoch,
                 "state_dict": tempo_nn.state_dict(),
@@ -276,16 +287,39 @@ if __name__ == "__main__":
 
         # print out updates
         print(f"Training Time: {(total_time_epoch / 60):.1f} minutes")
-        print(f"Training Loss: {loss['train']:.3f}, Validation Loss: {loss['validate']:.3f}")
-        print(f"Mean Training Error: {accuracy['train']:.3f}, Mean Validation Error: {accuracy['validate']:.3f}")
+        print(f"Training Loss: {history_epoch['train_loss']:.3f}, Validation Loss: {history_epoch['validate_loss']:.3f}")
+        print(f"Mean Training Error: {history_epoch['train_accuracy']:.3f}, Mean Validation Error: {history_epoch['validate_accuracy']:.3f}")
         print(f"Five Number Summary of Validation Errors: {' '.join((f'{value:.2f}' for value in (percentile_values[percentile] for percentile in (0, 25, 50, 75, 100))))}")
         print("----------------------------------------------------------------")
 
         ##################################################
 
 
+    ##################################################
+
+
+    # TRAIN EPOCHS
+    ##################################################
+
+    # helper function for training 
+    def train_epochs(start, n): # start = epoch to start training on; n = number of epochs to train from there
+        epochs_to_train = range(start, start + n)
+        for epoch in epochs_to_train:
+            print(f"EPOCH {epoch + 1} / {epochs_to_train.stop}")
+            train_an_epoch(epoch = epoch)
+
+    # first start by training my section of the neural network for a few epochs
+    train_epochs(start = start_epoch, n = EPOCHS)
+
+    ##################################################
+
+
     # MAKE TRAINING PLOTS TO SHOWCASE TRAINING OF MODEL
     ##################################################
+
+    # load in tsv files that have been generated
+    history = pd.read_csv(output_filepath_history, sep = "\t", header = 0, index_col = False)
+    percentiles_history = pd.read_csv(output_filepath_percentiles_history, sep = "\t", header = 0, index_col = False)
 
     # plot loss and percentiles per epoch
     fig, (loss_plot, percentiles_history_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (12, 7))
@@ -293,13 +327,12 @@ if __name__ == "__main__":
     colors = ["b", "r", "g", "c", "m", "y", "k"]
 
     # plot loss as a function of epoch
-    epochs_to_train = [epoch + 1 for epoch in epochs_to_train]
     loss_plot.set_xlabel("Epoch")
     # left side is loss per epoch, in blue
     color_loss = colors[0]
     loss_plot.set_ylabel("Loss", color = color_loss)
     for set_type, ls in zip(("train_loss", "validate_loss"), ("solid", "dashed")):
-        loss_plot.plot(epochs_to_train, history[set_type], color = color_loss, linestyle = ls, label = set_type.split("_")[0].title())
+        loss_plot.plot(history["epoch"], history[set_type], color = color_loss, linestyle = ls, label = set_type.split("_")[0].title())
     loss_plot.tick_params(axis = "y", labelcolor = color_loss)
     loss_plot.legend(title = "Loss", loc = "upper left")
     # right side is accuracy per epoch, in red
@@ -307,7 +340,7 @@ if __name__ == "__main__":
     color_accuracy = colors[1]
     loss_plot_accuracy.set_ylabel("Average Error", color = color_accuracy)
     for set_type, ls in zip(("train_accuracy", "validate_accuracy"), ("solid", "dashed")):
-        loss_plot_accuracy.plot(epochs_to_train, history[set_type], color = color_accuracy, linestyle = ls, label = set_type.split("_")[0].title())
+        loss_plot_accuracy.plot(history["epoch"], history[set_type], color = color_accuracy, linestyle = ls, label = set_type.split("_")[0].title())
     loss_plot_accuracy.tick_params(axis = "y", labelcolor = color_accuracy)
     loss_plot_accuracy.legend(title = "Error", loc = "upper right")
     loss_plot.set_title("Learning Curve & Average Error")
@@ -318,7 +351,7 @@ if __name__ == "__main__":
     percentiles_history = percentiles_history[percentiles_history["epoch"] > (max(percentiles_history["epoch"] - n_epochs))]
     for i, epoch in enumerate(sorted(pd.unique(percentiles_history["epoch"]))):
         percentile_at_epoch = percentiles_history[percentiles_history["epoch"] == epoch]
-        percentiles_history_plot.plot(percentile_at_epoch["percentile"], percentile_at_epoch["value"], color = colors[i], linestyle = "-", label = epoch)
+        percentiles_history_plot.plot(percentile_at_epoch["percentile"], percentile_at_epoch["value"], color = colors[i], linestyle = "solid", label = epoch)
     percentiles_history_plot.set_xlabel("Percentile")
     percentiles_history_plot.set_ylabel("Error")
     percentiles_history_plot.legend(title = "Epoch", loc = "upper left")
@@ -327,7 +360,7 @@ if __name__ == "__main__":
 
     # save figure
     fig.tight_layout()
-    fig.savefig(".".join(NN_FILEPATH.split(".")[:-1]) + ".png", dpi = 180) # save image
+    fig.savefig(OUTPUT_PREFIX + ".png", dpi = 180) # save image
 
     ##################################################
     
