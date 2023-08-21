@@ -2,7 +2,7 @@
 # Phillip Long
 # August 21, 2023
 
-# Makes plots describing the training of the neural network
+# Makes plots describing the training of the neural network.
 
 # python ./training_plots.py history_filepath percentiles_history_filepath output_filepath
 

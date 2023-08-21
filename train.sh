@@ -17,6 +17,7 @@ echo "JOB ID: ${SLURM_JOBID}"
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
+output_prefix="${data}/tempo_nn.pretrained"
 
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
@@ -40,5 +41,8 @@ module load miniconda3/4.12.0
 eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
-# run python script
-python "${artificial_dj}/determine_tempo/tempo_neural_network.py" "${data}/tempo_data.cluster.tsv" "${data}/tempo_nn.pretrained.pth" "${epochs}"
+# run python training script
+python "${artificial_dj}/determine_tempo/tempo_neural_network.py" "${data}/tempo_data.cluster.tsv" "${output_prefix}.pth" "${epochs}"
+
+# create plots
+python "${artificial_dj}/determine_tempo/training_plots.py" "${output_prefix}.history.tsv" "${output_prefix}.percentiles_history.tsv" "${output_prefix}.png"

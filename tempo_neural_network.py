@@ -19,7 +19,6 @@ from torch.utils.data import DataLoader
 from torchvision.models import resnet50, ResNet50_Weights
 from torchsummary import summary
 import pandas as pd
-import matplotlib.pyplot as plt
 from numpy import percentile
 from tempo_dataset import tempo_dataset # import dataset class
 # sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
@@ -314,56 +313,6 @@ if __name__ == "__main__":
     ##################################################
 
 
-    # MAKE TRAINING PLOTS TO SHOWCASE TRAINING OF MODEL
-    ##################################################
-
-    # load in tsv files that have been generated
-    history = pd.read_csv(output_filepath_history, sep = "\t", header = 0, index_col = False)
-    percentiles_history = pd.read_csv(output_filepath_percentiles_history, sep = "\t", header = 0, index_col = False)
-
-    # plot loss and percentiles per epoch
-    fig, (loss_plot, percentiles_history_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (12, 7))
-    fig.suptitle("Tempo Neural Network")
-    colors = ["b", "r", "g", "c", "m", "y", "k"]
-
-    # plot loss as a function of epoch
-    loss_plot.set_xlabel("Epoch")
-    # left side is loss per epoch, in blue
-    color_loss = colors[0]
-    loss_plot.set_ylabel("Loss", color = color_loss)
-    for set_type, ls in zip(("train_loss", "validate_loss"), ("solid", "dashed")):
-        loss_plot.plot(history["epoch"], history[set_type], color = color_loss, linestyle = ls, label = set_type.split("_")[0].title())
-    loss_plot.tick_params(axis = "y", labelcolor = color_loss)
-    loss_plot.legend(title = "Loss", loc = "upper left")
-    # right side is accuracy per epoch, in red
-    loss_plot_accuracy = loss_plot.twinx()
-    color_accuracy = colors[1]
-    loss_plot_accuracy.set_ylabel("Average Error", color = color_accuracy)
-    for set_type, ls in zip(("train_accuracy", "validate_accuracy"), ("solid", "dashed")):
-        loss_plot_accuracy.plot(history["epoch"], history[set_type], color = color_accuracy, linestyle = ls, label = set_type.split("_")[0].title())
-    loss_plot_accuracy.tick_params(axis = "y", labelcolor = color_accuracy)
-    loss_plot_accuracy.legend(title = "Error", loc = "upper right")
-    loss_plot.set_title("Learning Curve & Average Error")
-
-    # plot percentiles per epoch (final 5 epochs)
-    n_epochs = min(EPOCHS, 5, len(colors))
-    colors = colors[:n_epochs]
-    percentiles_history = percentiles_history[percentiles_history["epoch"] > (max(percentiles_history["epoch"] - n_epochs))]
-    for i, epoch in enumerate(sorted(pd.unique(percentiles_history["epoch"]))):
-        percentile_at_epoch = percentiles_history[percentiles_history["epoch"] == epoch]
-        percentiles_history_plot.plot(percentile_at_epoch["percentile"], percentile_at_epoch["value"], color = colors[i], linestyle = "solid", label = epoch)
-    percentiles_history_plot.set_xlabel("Percentile")
-    percentiles_history_plot.set_ylabel("Error")
-    percentiles_history_plot.legend(title = "Epoch", loc = "upper left")
-    percentiles_history_plot.grid()
-    percentiles_history_plot.set_title("Validation Data Percentiles")
-
-    # save figure
-    fig.tight_layout()
-    fig.savefig(OUTPUT_PREFIX + ".png", dpi = 180) # save image
-
-    ##################################################
-    
     # PRINT TRAINING STATISTICS
     ##################################################
 
