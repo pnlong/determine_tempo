@@ -288,7 +288,7 @@ if __name__ == "__main__":
     ##################################################
 
     # plot loss and percentiles per epoch
-    fig, (loss_plot, percentiles_history_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (10, 8))
+    fig, (loss_plot, percentiles_history_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (12, 7))
     fig.suptitle("Tempo Neural Network")
     colors = ["b", "r", "g", "c", "m", "y", "k"]
 
@@ -326,6 +326,7 @@ if __name__ == "__main__":
     percentiles_history_plot.set_title("Validation Data Percentiles")
 
     # save figure
+    fig.tight_layout()
     fig.savefig(".".join(NN_FILEPATH.split(".")[:-1]) + ".png", dpi = 180) # save image
 
     ##################################################
