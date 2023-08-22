@@ -47,21 +47,19 @@ colors = ["b", "r", "g", "c", "m", "y", "k"]
 
 loss_plot.set_xlabel("Epoch")
 
-# left side is loss per epoch, in blue
-color_loss = colors[0]
-loss_plot.set_ylabel("Loss", color = color_loss)
-for set_type, ls in zip(("train_loss", "validate_loss"), ("solid", "dashed")):
-    loss_plot.plot(history["epoch"], history[set_type], color = color_loss, linestyle = ls, label = set_type.split("_")[0].title())
-loss_plot.tick_params(axis = "y", labelcolor = color_loss)
+# left side is loss per epoch
+loss_plot.set_ylabel("Loss")
+for set_type, color in zip(("train_loss", "validate_loss"), colors[:2]):
+    loss_plot.plot(history["epoch"], history[set_type], color = color, linestyle = "solid", label = set_type.split("_")[0].title())
+loss_plot.tick_params(axis = "y")
 loss_plot.legend(title = "Loss", loc = "upper left")
 
-# right side is accuracy per epoch, in red
+# right side is accuracy per epoch
 loss_plot_accuracy = loss_plot.twinx()
-color_accuracy = colors[1]
-loss_plot_accuracy.set_ylabel("Average Error", color = color_accuracy)
-for set_type, ls in zip(("train_accuracy", "validate_accuracy"), ("solid", "dashed")):
-    loss_plot_accuracy.plot(history["epoch"], history[set_type], color = color_accuracy, linestyle = ls, label = set_type.split("_")[0].title())
-loss_plot_accuracy.tick_params(axis = "y", labelcolor = color_accuracy)
+loss_plot_accuracy.set_ylabel("Error")
+for set_type, color in zip(("train_accuracy", "validate_accuracy"), colors[:2]):
+    loss_plot_accuracy.plot(history["epoch"], history[set_type], color = color, linestyle = "dashed", label = set_type.split("_")[0].title())
+loss_plot_accuracy.tick_params(axis = "y")
 loss_plot_accuracy.legend(title = "Error", loc = "upper right")
 loss_plot.set_title("Learning Curve & Average Error")
 
