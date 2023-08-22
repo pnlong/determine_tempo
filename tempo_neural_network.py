@@ -5,8 +5,8 @@
 # Creates and trains a linear regression neural network in PyTorch.
 # Given an audio file as input, it outputs a single number representing the song's tempo in Beats per Minute (BPM).
 
-# python ./tempo_neural_network.py labels_filepath nn_filepath epochs
-# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_tempo/tempo_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth" "1"
+# python ./tempo_neural_network.py labels_filepath nn_filepath
+# python /Users/philliplong/Desktop/Coding/artificial_dj/determine_tempo/tempo_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth"
 
 
 # IMPORTS
@@ -23,7 +23,7 @@ import pandas as pd
 from numpy import percentile
 from tempo_dataset import tempo_dataset # import dataset class
 # sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
-# sys.argv = ("./tempo_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth", "")
+# sys.argv = ("./tempo_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth")
 ##################################################
 
 
@@ -31,10 +31,11 @@ from tempo_dataset import tempo_dataset # import dataset class
 ##################################################
 BATCH_SIZE = 128
 # LEARNING_RATE = 1e-3
-try:
-    EPOCHS = max(0, int(sys.argv[3])) # in case of a negative number
-except (IndexError, ValueError): # in case there is no epochs argument or there is a non-int string
-    EPOCHS = 10
+# try:
+#     EPOCHS = max(0, int(sys.argv[3])) # in case of a negative number
+# except (IndexError, ValueError): # in case there is no epochs argument or there is a non-int string
+#     EPOCHS = 10
+EPOCHS_PER_PASS = (3, 3, 2) # for each pass, number of epochs to train
 ##################################################
 
 
@@ -316,9 +317,8 @@ if __name__ == "__main__":
         print("================================================================")
 
     # train epochs
-    epochs_per_pass = (3, 2, 1) # for each pass, number of epochs to train
-    for i in range(len(epochs_per_pass)):
-        epochs = epochs_per_pass[i]
+    for i in range(len(EPOCHS_PER_PASS)):
+        epochs = EPOCHS_PER_PASS[i]
 
         # start by training my section of the neural network for some epochs
         print(f"PASS {i + 1}; training final regression layer...")

@@ -5,6 +5,7 @@
 # Makes plots describing the training of the neural network.
 
 # python ./training_plots.py history_filepath percentiles_history_filepath output_filepath
+# python /dfs7/adl/pnlong/artificial_dj/determine_tempo/training_plots.py "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pretrained.history.tsv" "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pretrained.percentiles_history.tsv" "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pretrained.png"
 
 
 # IMPORTS
@@ -35,33 +36,35 @@ percentiles_history = pd.read_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t
 ##################################################
 
 # plot loss and percentiles per epoch
-fig, (loss_plot, percentiles_history_plot) = plt.subplots(nrows = 1, ncols = 2, figsize = (12, 7))
+fig, axes = plt.subplot_mosaic([["loss", "percentiles_history"], ["accuracy", "percentiles_history"]], constrained_layout = True, figsize = (12, 8))
 fig.suptitle("Tempo Neural Network")
 colors = ["b", "r", "g", "c", "m", "y", "k"]
 
 ##################################################
 
 
-# PLOT LOSS AND ACCURACY
+# PLOT LOSS
 ##################################################
 
-loss_plot.set_xlabel("Epoch")
-
-# left side is loss per epoch
-loss_plot.set_ylabel("Loss")
 for set_type, color in zip(("train_loss", "validate_loss"), colors[:2]):
-    loss_plot.plot(history["epoch"], history[set_type], color = color, linestyle = "solid", label = set_type.split("_")[0].title())
-loss_plot.tick_params(axis = "y")
-loss_plot.legend(title = "Loss", loc = "upper left")
+    axes["loss"].plot(history["epoch"], history[set_type], color = color, linestyle = "solid", label = set_type.split("_")[0].title())
+axes["loss"].set_xlabel("Epoch")
+axes["loss"].set_ylabel("Loss")
+axes["loss"].legend(loc = "upper right")
+axes["accuracy"].set_title("Learning Curve")
 
-# right side is accuracy per epoch
-loss_plot_accuracy = loss_plot.twinx()
-loss_plot_accuracy.set_ylabel("Error")
+##################################################
+
+
+# PLOT ACCURACY
+##################################################
+
 for set_type, color in zip(("train_accuracy", "validate_accuracy"), colors[:2]):
-    loss_plot_accuracy.plot(history["epoch"], history[set_type], color = color, linestyle = "dashed", label = set_type.split("_")[0].title())
-loss_plot_accuracy.tick_params(axis = "y")
-loss_plot_accuracy.legend(title = "Error", loc = "upper right")
-loss_plot.set_title("Learning Curve & Average Error")
+    axes["accuracy"].plot(history["epoch"], history[set_type], color = color, linestyle = "dashed", label = set_type.split("_")[0].title())
+axes["loss"].sharex(axes["accuracy"])
+axes["accuracy"].set_ylabel("Average Error")
+axes["accuracy"].legend(loc = "upper right")
+axes["accuracy"].set_title("Average Error")
 
 ##################################################
 
@@ -76,12 +79,12 @@ colors = colors[:n_epochs]
 percentiles_history = percentiles_history[percentiles_history["epoch"] > (max(percentiles_history["epoch"] - n_epochs))]
 for i, epoch in enumerate(epochs):
     percentile_at_epoch = percentiles_history[percentiles_history["epoch"] == epoch]
-    percentiles_history_plot.plot(percentile_at_epoch["percentile"], percentile_at_epoch["value"], color = colors[i], linestyle = "solid", label = epoch)
-percentiles_history_plot.set_xlabel("Percentile")
-percentiles_history_plot.set_ylabel("Error")
-percentiles_history_plot.legend(title = "Epoch", loc = "upper left")
-percentiles_history_plot.grid()
-percentiles_history_plot.set_title("Validation Data Percentiles")
+    axes["percentiles_history"].plot(percentile_at_epoch["percentile"], percentile_at_epoch["value"], color = colors[i], linestyle = "solid", label = epoch)
+axes["percentiles_history"].set_xlabel("Percentile")
+axes["percentiles_history"].set_ylabel("Error")
+axes["percentiles_history"].legend(title = "Epoch", loc = "upper left")
+axes["percentiles_history"].grid()
+axes["percentiles_history"].set_title("Validation Data Percentiles")
 
 ##################################################
 
@@ -90,7 +93,6 @@ percentiles_history_plot.set_title("Validation Data Percentiles")
 ##################################################
 
 # save figure
-fig.tight_layout()
 fig.savefig(OUTPUT_FILEPATH, dpi = 180) # save image
 
 ##################################################

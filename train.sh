@@ -17,22 +17,22 @@ echo "JOB ID: ${SLURM_JOBID}"
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
-output_prefix="${data}/tempo_nn.pretrained"
+output_prefix="${data}/tempo_nn.pretrained_tuning"
 
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
 
 # set number of epochs
-epochs="default"
-while getopts ":e:" opt
-do
-    case $opt in
-        e) epochs=$OPTARG;;
-       \?) echo "ERROR: Invalid option: ${0} [-e <e>]"
-           exit 1;;
-    esac
-done
-echo "EPOCHS: ${epochs}"
+# epochs="default"
+# while getopts ":e:" opt
+# do
+#     case $opt in
+#         e) epochs=$OPTARG;;
+#        \?) echo "ERROR: Invalid option: ${0} [-e <e>]"
+#            exit 1;;
+#     esac
+# done
+# echo "EPOCHS: ${epochs}"
 
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
