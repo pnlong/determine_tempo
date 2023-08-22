@@ -105,3 +105,19 @@ sbatch ./gunzip_tempo_data.sh
 
 ## Results
 
+I first attempted to create my own neural network from scratch. Note that one of my "convolutional blocks" consists of a convolutional layer followed by a ReLU activation function and max-pooling. My network had the following layout:
+
+- convolutional block 1
+- convolutional block 2
+- convolutional block 3
+- convolutional block 4
+- flattening layer
+- linear layer 1
+- linear layer 2
+- linear layer 3 with a single-feature output (predicted BPM)
+
+This network performed poorly. On both training and validation sets, predicted tempos had an average error of roughly 18 BPM; this was inadequate for my standards. Because the training and validation sets had similar errors, I could tell that my network was suffering from neither high variance nor bias. Combined with the fact that its learning curve had essentially flattened-out after two out of 10 epochs of training, I diagnosed my original network's problem as poor network architecture.
+
+To clarify, my ultimate goal is to train a network that predicts tempo with an average error of less than 5 BPM, and with 95% of predictions having an error of less than 10 BPM.
+
+My next attempt involved using `torchvision`'s pretrained neural networks, specifically *ResNet50*. Upon loading *ResNet50*'s default weights, I replaced the final classification layer with a single-feature-output regression layer. My method of training involved freezing all of the pretrained *ResNet50* weights while I trained my regression layer, followed up by a fine-tuning of the pretrained weights for the same amount of epochs while I froze my regression layer. I repeated this back-and-forth process three times.

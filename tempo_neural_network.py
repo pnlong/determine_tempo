@@ -14,6 +14,7 @@
 import sys
 from time import time
 from os.path import exists
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from torchvision.models import resnet50, ResNet50_Weights
@@ -29,7 +30,7 @@ from tempo_dataset import tempo_dataset # import dataset class
 # CONSTANTS
 ##################################################
 BATCH_SIZE = 128
-LEARNING_RATE = 1e-3
+# LEARNING_RATE = 1e-3
 try:
     EPOCHS = max(0, int(sys.argv[3])) # in case of a negative number
 except (IndexError, ValueError): # in case there is no epochs argument or there is a non-int string
@@ -62,6 +63,7 @@ class tempo_nn(torch.nn.Module):
             parameter.requires_grad = False
         for parameter in self.model.fc.parameters():
             parameter.requires_grad = True
+        self.pretrained_is_frozen = True # set this switch to True
 
         # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
         # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
@@ -90,8 +92,11 @@ class tempo_nn(torch.nn.Module):
 
     # flip the requires_grad value for all of the model's parameters, so that I can fine tune either the pretrained or my specific section without affecting the other
     def flip_requires_grad(self):
+        # change parameters
         for parameter in self.model.parameters():
             parameter.requires_grad = not (parameter.requires_grad)
+        self.pretrained_is_frozen = not (self.pretrained_is_frozen) # flip switch
+        print(f"Pretrained parameters have been {'frozen' if self.pretrained_is_frozen else 'unfrozen'}.") # print out status of parameters
 
 ##################################################
 
@@ -151,13 +156,15 @@ if __name__ == "__main__":
 
     # history of losses and accuracy
     history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy")
-    output_filepath_history = OUTPUT_PREFIX + ".history.tsv"
-    pd.DataFrame(columns = history_columns).to_csv(output_filepath_history, sep = "\t", header = True, index = False, mode = "w") # write column names
+    OUTPUT_FILEPATH_HISTORY = OUTPUT_PREFIX + ".history.tsv"
+    if not exists(OUTPUT_FILEPATH_HISTORY): # write column names if they are not there yet
+        pd.DataFrame(columns = history_columns).to_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = True, index = False, mode = "w") # write column names
 
     # history of percentiles in validation data
     percentiles_history_columns = ("epoch", "percentile", "value")
-    output_filepath_percentiles_history = OUTPUT_PREFIX + ".percentiles_history.tsv"
-    pd.DataFrame(columns = percentiles_history_columns).to_csv(output_filepath_percentiles_history, sep = "\t", header = True, index = False, mode = "w") # write column names
+    OUTPUT_FILEPATH_PERCENTILES_HISTORY = OUTPUT_PREFIX + ".percentiles_history.tsv"
+    if not exists(OUTPUT_FILEPATH_PERCENTILES_HISTORY): # write column names if they are not there yet
+        pd.DataFrame(columns = percentiles_history_columns).to_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = True, index = False, mode = "w") # write column names
     
     # percentiles for percentiles plots; define here since it doesn't need to be redefined every epoch
     percentiles = range(0, 101)
@@ -184,7 +191,7 @@ if __name__ == "__main__":
         start_time_epoch = time()
 
         # training loop
-        for inputs, labels in data_loader["train"]:
+        for inputs, labels in tqdm(data_loader["train"], desc = "Training"):
 
             # register inputs and labels with device
             inputs, labels = inputs.to(device), labels.to(device)
@@ -267,11 +274,11 @@ if __name__ == "__main__":
         history_epoch["validate_loss"] /= len(data["validate"])
         history_epoch["validate_accuracy"] /= len(data["validate"])
         # store average losses and accuracies in history
-        pd.DataFrame(data = [history_epoch], columns = history_columns).to_csv(output_filepath_history, sep = "\t", header = False, index = False, mode = "a") # write to file
+        pd.DataFrame(data = [history_epoch], columns = history_columns).to_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = False, index = False, mode = "a") # write to file
 
         # calculate percentiles
         percentile_values = percentile(error_validate.numpy(force = True), q = percentiles)
-        pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values}, columns = percentiles_history_columns).to_csv(output_filepath_percentiles_history, sep = "\t", header = False, index = False, mode = "a") # write to file
+        pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values}, columns = percentiles_history_columns).to_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = False, index = False, mode = "a") # write to file
 
         # save current model if its validation accuracy is the best so far
         global best_accuracy
@@ -289,7 +296,6 @@ if __name__ == "__main__":
         print(f"Training Loss: {history_epoch['train_loss']:.3f}, Validation Loss: {history_epoch['validate_loss']:.3f}")
         print(f"Mean Training Error: {history_epoch['train_accuracy']:.3f}, Mean Validation Error: {history_epoch['validate_accuracy']:.3f}")
         print(f"Five Number Summary of Validation Errors: {' '.join((f'{value:.2f}' for value in (percentile_values[percentile] for percentile in (0, 25, 50, 75, 100))))}")
-        print("----------------------------------------------------------------")
 
         ##################################################
 
@@ -304,11 +310,29 @@ if __name__ == "__main__":
     def train_epochs(start, n): # start = epoch to start training on; n = number of epochs to train from there
         epochs_to_train = range(start, start + n)
         for epoch in epochs_to_train:
+            print("----------------------------------------------------------------")
             print(f"EPOCH {epoch + 1} / {epochs_to_train.stop}")
             train_an_epoch(epoch = epoch)
+        print("================================================================")
 
-    # first start by training my section of the neural network for a few epochs
-    train_epochs(start = start_epoch, n = EPOCHS)
+    # train epochs
+    epochs_per_pass = (3, 2, 1) # for each pass, number of epochs to train
+    for i in range(len(epochs_per_pass)):
+        epochs = epochs_per_pass[i]
+
+        # start by training my section of the neural network for some epochs
+        print(f"PASS {i + 1}; training final regression layer...")
+        train_epochs(start = start_epoch, n = epochs)
+        start_epoch += epochs
+
+        # fine tune the pretrained layers
+        tempo_nn.flip_requires_grad() # flip gradient requirements
+        print(f"PASS {i}; fine-tuning pretrained layers...")
+        train_epochs(start = start_epoch, n = epochs)
+        start_epoch += epochs
+
+        # flip gradient requirements for next cycle
+        tempo_nn.flip_requires_grad()
 
     ##################################################
 
@@ -322,7 +346,6 @@ if __name__ == "__main__":
     del end_time, start_time
 
     # print training statistics
-    print("================================================================")
     print("Training is done.")
     print(f"Time Elapsed: {total_time // (60 * 60):.0f} hours and {(total_time % (60 * 60)) / 60:.1f} minutes")
     
