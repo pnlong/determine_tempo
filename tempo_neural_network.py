@@ -5,7 +5,7 @@
 # Creates and trains a linear regression neural network in PyTorch.
 # Given an audio file as input, it outputs a single number representing the song's tempo in Beats per Minute (BPM).
 
-# python ./tempo_neural_network.py labels_filepath nn_filepath
+# python ./tempo_neural_network.py labels_filepath nn_filepath freeze_pretrained epochs
 # python /Users/philliplong/Desktop/Coding/artificial_dj/determine_tempo/tempo_neural_network.py "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv" "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth"
 
 
@@ -31,11 +31,21 @@ from tempo_dataset import tempo_dataset # import dataset class
 ##################################################
 BATCH_SIZE = 128
 # LEARNING_RATE = 1e-3
-# try:
-#     EPOCHS = max(0, int(sys.argv[3])) # in case of a negative number
-# except (IndexError, ValueError): # in case there is no epochs argument or there is a non-int string
-#     EPOCHS = 10
-EPOCHS_PER_PASS = (3, 3, 2) # for each pass, number of epochs to train
+# freeze pretrained parameters (true = freeze pretrained, false = unfreeze pretrained, freeze my parameters)
+try:
+    if sys.argv[3].lower().startswith("t"):
+        FREEZE_PRETRAINED = True
+    elif sys.argv[3].lower().startswith("f"):
+        FREEZE_PRETRAINED = False
+    else:
+        FREEZE_PRETRAINED = None
+except (IndexError):
+    FREEZE_PRETRAINED = None
+# number of epochs to train
+try:
+    EPOCHS = max(0, int(sys.argv[4])) # in case of a negative number
+except (IndexError, ValueError): # in case there is no epochs argument or there is a non-int string
+    EPOCHS = 10
 ##################################################
 
 
@@ -43,7 +53,7 @@ EPOCHS_PER_PASS = (3, 3, 2) # for each pass, number of epochs to train
 ##################################################
 class tempo_nn(torch.nn.Module):
 
-    def __init__(self, nn_filepath, device):
+    def __init__(self, nn_filepath, device, freeze_pretrained = None):
         super().__init__()
 
         # initialize pretrained model from pytorch, setting pretrained to True
@@ -59,13 +69,16 @@ class tempo_nn(torch.nn.Module):
             checkpoint = torch.load(nn_filepath, map_location = device)
             self.model.load_state_dict(checkpoint["state_dict"], strict = False)
 
-        # freeze model parameters (since the model is already trained, we don't want to retrain them) except for the final layer
-        for parameter in self.model.parameters():
+        # freeze layers according to freeze_pretrained argument
+        for parameter in self.model.parameters(): # by default, all layers are frozen
             parameter.requires_grad = False
-        for parameter in self.model.fc.parameters():
-            parameter.requires_grad = True
-        self.pretrained_is_frozen = True # set this switch to True
-
+        if freeze_pretrained is not None:
+            for parameter in self.model.fc.parameters(): # create the distinction between my layers and the pretrained layers by unfreezing my layers (freeze_pretrained == True)
+                parameter.requires_grad = True
+            if not freeze_pretrained: # if (freeze_pretrained == False), switch all values such that the pretrained layers require a gradient and the output regression layer does not
+                for parameter in self.model.parameters(): # create the distinction between my layers and the pretrained layers
+                    parameter.requires_grad = not (parameter.requires_grad)
+        
         # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
         # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
         # self.conv2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
@@ -90,14 +103,6 @@ class tempo_nn(torch.nn.Module):
         # x = self.linear2(x)
         # output = self.output(x)
         # return output
-
-    # flip the requires_grad value for all of the model's parameters, so that I can fine tune either the pretrained or my specific section without affecting the other
-    def flip_requires_grad(self):
-        # change parameters
-        for parameter in self.model.parameters():
-            parameter.requires_grad = not (parameter.requires_grad)
-        self.pretrained_is_frozen = not (self.pretrained_is_frozen) # flip switch
-        print(f"Pretrained parameters have been {'frozen' if self.pretrained_is_frozen else 'unfrozen'}.") # print out status of parameters
 
 ##################################################
 
@@ -130,7 +135,7 @@ if __name__ == "__main__":
     }
 
     # construct model and assign it to device, also summarize 
-    tempo_nn = tempo_nn(nn_filepath = NN_FILEPATH, device = device).to(device)
+    tempo_nn = tempo_nn(nn_filepath = NN_FILEPATH, device = device, freeze_pretrained = FREEZE_PRETRAINED).to(device)
     if device == "cuda": # some memory usage statistics
         print(f"Device Name: {torch.cuda.get_device_name(0)}")
         print("Memory Usage:")
@@ -316,23 +321,16 @@ if __name__ == "__main__":
             train_an_epoch(epoch = epoch)
         print("================================================================")
 
-    # train epochs
-    for i in range(len(EPOCHS_PER_PASS)):
-        epochs = EPOCHS_PER_PASS[i]
-
-        # start by training my section of the neural network for some epochs
-        print(f"PASS {i + 1}; training final regression layer...")
-        train_epochs(start = start_epoch, n = epochs)
-        start_epoch += epochs
-
-        # fine tune the pretrained layers
-        tempo_nn.flip_requires_grad() # flip gradient requirements
-        print(f"PASS {i}; fine-tuning pretrained layers...")
-        train_epochs(start = start_epoch, n = epochs)
-        start_epoch += epochs
-
-        # flip gradient requirements for next cycle
-        tempo_nn.flip_requires_grad()
+    # train
+    # start by training my section of the neural network for some epochs
+    if FREEZE_PRETRAINED:
+        print("Training final regression layer...")
+        train_epochs(start = start_epoch, n = EPOCHS)
+    elif not FREEZE_PRETRAINED:
+        print("Fine-tuning pretrained layers...")
+        train_epochs(start = start_epoch, n = EPOCHS)
+    else:
+        sys.exit("All parameters are frozen, so the model will not be trained. Exiting program...")
 
     ##################################################
 
