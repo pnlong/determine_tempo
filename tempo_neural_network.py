@@ -29,7 +29,7 @@ from tempo_dataset import tempo_dataset # import dataset class
 
 # CONSTANTS
 ##################################################
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 # LEARNING_RATE = 1e-3
 # freeze pretrained parameters (true = freeze pretrained, false = unfreeze pretrained, freeze my parameters)
 try:
@@ -161,16 +161,16 @@ if __name__ == "__main__":
     best_accuracy = 1e+24 # make sure to adjust for different accuracy metrics
 
     # history of losses and accuracy
-    history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy")
+    history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy", "freeze_pretrained")
     OUTPUT_FILEPATH_HISTORY = OUTPUT_PREFIX + ".history.tsv"
     if not exists(OUTPUT_FILEPATH_HISTORY): # write column names if they are not there yet
-        pd.DataFrame(columns = history_columns).to_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = True, index = False, mode = "w") # write column names
+        pd.DataFrame(columns = history_columns).to_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = True, index = False, na_rep = "NA", mode = "w") # write column names
 
     # history of percentiles in validation data
     percentiles_history_columns = ("epoch", "percentile", "value")
     OUTPUT_FILEPATH_PERCENTILES_HISTORY = OUTPUT_PREFIX + ".percentiles_history.tsv"
     if not exists(OUTPUT_FILEPATH_PERCENTILES_HISTORY): # write column names if they are not there yet
-        pd.DataFrame(columns = percentiles_history_columns).to_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = True, index = False, mode = "w") # write column names
+        pd.DataFrame(columns = percentiles_history_columns).to_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = True, index = False, na_rep = "NA", mode = "w") # write column names
     
     # percentiles for percentiles plots; define here since it doesn't need to be redefined every epoch
     percentiles = range(0, 101)
@@ -194,6 +194,7 @@ if __name__ == "__main__":
         # instantiate some stats values
         history_epoch = dict(zip(history_columns, (0.0,) * len(history_columns))) # in the case of linear regression, accuracy is actually the average absolute error
         history_epoch["epoch"] = epoch + 1
+        history_epoch["freeze_pretrained"] = FREEZE_PRETRAINED
         start_time_epoch = time()
 
         # training loop
@@ -245,7 +246,7 @@ if __name__ == "__main__":
 
             # validation loop
             error_validate = torch.Tensor().to(device)
-            for inputs, labels in data_loader["validate"]:
+            for inputs, labels in tqdm(data_loader["validate"], desc = "Validating"):
 
                 # register inputs and labels with device
                 inputs, labels = inputs.to(device), labels.to(device)
@@ -280,11 +281,11 @@ if __name__ == "__main__":
         history_epoch["validate_loss"] /= len(data["validate"])
         history_epoch["validate_accuracy"] /= len(data["validate"])
         # store average losses and accuracies in history
-        pd.DataFrame(data = [history_epoch], columns = history_columns).to_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = False, index = False, mode = "a") # write to file
+        pd.DataFrame(data = [history_epoch], columns = history_columns).to_csv(OUTPUT_FILEPATH_HISTORY, sep = "\t", header = False, index = False, na_rep = "NA", mode = "a") # write to file
 
         # calculate percentiles
         percentile_values = percentile(error_validate.numpy(force = True), q = percentiles)
-        pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values}, columns = percentiles_history_columns).to_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = False, index = False, mode = "a") # write to file
+        pd.DataFrame(data = {"epoch": [epoch + 1,] * len(percentiles), "percentile": percentiles, "value": percentile_values}, columns = percentiles_history_columns).to_csv(OUTPUT_FILEPATH_PERCENTILES_HISTORY, sep = "\t", header = False, index = False, na_rep = "NA", mode = "a") # write to file
 
         # save current model if its validation accuracy is the best so far
         global best_accuracy
