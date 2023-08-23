@@ -61,8 +61,10 @@ class tempo_nn(torch.nn.Module):
 
         # change the final layer of the model to match my problem, change depending on the transfer learning model being used
         self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000),
-                                            torch.nn.Linear(in_features = 1000, out_features = 1) # one output feature = one predicted value
-                                            )
+                                            torch.nn.ReLU(),
+                                            torch.nn.Linear(in_features = 1000, out_features = 10),
+                                            torch.nn.ReLU(),
+                                            torch.nn.Linear(in_features = 10, out_features = 1)) # one output feature = one predicted value
 
         # try to load previously saved parameters
         if exists(nn_filepath):
