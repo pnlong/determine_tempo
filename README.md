@@ -122,12 +122,23 @@ I first attempted to create my own neural network from scratch. Note that one of
 - convolutional block 3
 - convolutional block 4
 - flattening layer
-- linear layer 1
-- linear layer 2
-- linear layer 3 with a single-feature output (predicted BPM)
+- linear layer 1 (100 output features)
+- linear layer 2 (10 output features)
+- output layer (single-feature output, predicted BPM)
 
 This network performed poorly. On both training and validation sets, predicted tempos had an average error of roughly 18 BPM; this was inadequate for my standards. Because the training and validation sets had similar errors, I could tell that my network was suffering from neither high variance nor bias. Combined with the fact that its learning curve had essentially flattened-out after two out of 10 epochs of training, I diagnosed my original network's problem as poor network architecture.
 
 To clarify, my ultimate goal is to train a network that predicts tempo with an average error of less than 5 BPM, and with 95% of predictions having an error of less than 10 BPM.
 
-My next attempt involved using `torchvision`'s pretrained neural networks, specifically *ResNet50*. Upon loading *ResNet50*'s default weights, I replaced the final classification layer with a single-feature-output regression layer. My method of training involved freezing all of the pretrained *ResNet50* weights while I trained my regression layer, followed up by a fine-tuning of the pretrained weights for the same amount of epochs while I froze my regression layer. I repeated this back-and-forth process three times.
+My next attempt involved using `torchvision`'s pretrained neural networks, specifically *ResNet50*. Upon loading *ResNet50*'s default weights, I replaced the final classification block with a single-feature-output regression block. The architecture of my regression block looked like this:
+
+- linear layer 1 (1000 output features)
+- linear layer 2 (single-feature output)
+
+My method of training involved freezing all of the pretrained *ResNet50* weights while I trained my regression block, followed up by a fine-tuning of the pretrained weights for the same amount of epochs while I froze my regression block. I repeated this back-and-forth process three times, training six epochs each on the first pass, four each on the second pass, and finally two each on the third pass. To my surprise, this model actually performed slightly worse than my custom one, with an average error on both the training and validation sets of about 20 BPM. It was then that I realized that I had forgot a crucial detail in my final regression block: activation functions! I reworked the architecture of my regression block so that it looked like this:
+
+- linear layer 1 -> ReLU
+- linear layer 2 -> ReLU
+- linear layer 3 -> ReLU
+- output layer (single-feature output)
+

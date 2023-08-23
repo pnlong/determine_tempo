@@ -51,61 +51,64 @@ except (IndexError, ValueError): # in case there is no epochs argument or there 
 
 # NEURAL NETWORK CLASS
 ##################################################
+use_pretrained_model = True
 class tempo_nn(torch.nn.Module):
 
     def __init__(self, nn_filepath, device, freeze_pretrained = None):
         super().__init__()
 
+        if use_pretrained_model:
         # initialize pretrained model from pytorch, setting pretrained to True
-        self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
+            self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
 
-        # change the final layer of the model to match my problem, change depending on the transfer learning model being used
-        self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000), torch.nn.ReLU(),
-                                            torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU(),
-                                            torch.nn.Linear(in_features = 100, out_features = 10), torch.nn.ReLU(),
-                                            torch.nn.Linear(in_features = 10, out_features = 1)) # one output feature = one predicted value
+            # change the final layer of the model to match my problem, change depending on the transfer learning model being used
+            self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 100, out_features = 10), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 10, out_features = 1)) # one output feature = one predicted value
 
-        # try to load previously saved parameters
-        if exists(nn_filepath):
-            checkpoint = torch.load(nn_filepath, map_location = device)
-            self.model.load_state_dict(checkpoint["state_dict"], strict = False)
+            # try to load previously saved parameters
+            if exists(nn_filepath):
+                checkpoint = torch.load(nn_filepath, map_location = device)
+                self.model.load_state_dict(checkpoint["state_dict"], strict = False)
 
-        # freeze layers according to freeze_pretrained argument, by default all layers require gradient
-        for parameter in self.model.parameters(): # unfreeze all layers
-                parameter.requires_grad = True
-        if freeze_pretrained is not None:
-            # freeze_pretrained == False
-            for parameter in self.model.fc.parameters(): # create the distinction between my layers and the pretrained layers by freezing my layers (freeze_pretrained == False)
-                parameter.requires_grad = False
-            # freeze_pretrained == True
-            if freeze_pretrained: # if (freeze_pretrained == True), switch all values such that the pretrained layers do not requires_grad and the output regression layer does
-                for parameter in self.model.parameters():
-                    parameter.requires_grad = not (parameter.requires_grad)
-        
-        # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
-        # self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.conv2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.conv3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.conv4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
-        # self.flatten = torch.nn.Flatten(start_dim = 1)
-        # self.linear1 = torch.nn.Linear(in_features = 17920, out_features = 100)
-        # self.linear2 = torch.nn.Linear(in_features = 100, out_features = 10)
-        # self.output = torch.nn.Linear(in_features = 10, out_features = 1)
+            # freeze layers according to freeze_pretrained argument, by default all layers require gradient
+            for parameter in self.model.parameters(): # unfreeze all layers
+                    parameter.requires_grad = True
+            if freeze_pretrained is not None:
+                # freeze_pretrained == False
+                for parameter in self.model.fc.parameters(): # create the distinction between my layers and the pretrained layers by freezing my layers (freeze_pretrained == False)
+                    parameter.requires_grad = False
+                # freeze_pretrained == True
+                if freeze_pretrained: # if (freeze_pretrained == True), switch all values such that the pretrained layers do not requires_grad and the output regression layer does
+                    for parameter in self.model.parameters():
+                        parameter.requires_grad = not (parameter.requires_grad)
+
+        else:    
+            # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear block 1 -> linear block 2 -> output
+            self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.conv2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.conv3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.conv4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
+            self.flatten = torch.nn.Flatten(start_dim = 1)
+            self.linear1 = torch.nn.Sequential(torch.nn.Linear(in_features = 17920, out_features = 100), torch.nn.ReLU())
+            self.linear2 = torch.nn.Sequential(torch.nn.Linear(in_features = 100, out_features = 10), torch.nn.ReLU())
+            self.output = torch.nn.Linear(in_features = 10, out_features = 1)
 
     def forward(self, input_data):
-
-        output = self.model(input_data)
+        if use_pretrained_model:
+            output = self.model(input_data)
+        else:
+            x = self.conv1(input_data)
+            x = self.conv2(x)
+            x = self.conv3(x)
+            x = self.conv4(x)
+            x = self.flatten(x)
+            x = self.linear1(x)
+            x = self.linear2(x)
+            output = self.output(x)
+        
         return output
-
-        # x = self.conv1(input_data)
-        # x = self.conv2(x)
-        # x = self.conv3(x)
-        # x = self.conv4(x)
-        # x = self.flatten(x)
-        # x = self.linear1(x)
-        # x = self.linear2(x)
-        # output = self.output(x)
-        # return output
 
 ##################################################
 
