@@ -222,12 +222,14 @@ if __name__ == "__main__":
         start_frame, end_frame = _trim_silence(signal = signal, sample_rate = sample_rate, window_size = 0.1) # return frames for which audible audio begins and ends
         window_size = int(SAMPLE_DURATION * sample_rate) # convert window size from seconds to frames
         starting_frames = tuple(range(start_frame, end_frame - window_size, int(STEP_SIZE * sample_rate))) # get frame numbers for which each chop starts
+        origin_filepath = data.at[i, "path"] # set original filepath
+        tempo = data.at[i, "tempo"] # set the tempo
         for j, starting_frame in enumerate(starting_frames):
-            path = join(AUDIO_DIR, f"{i}_{j}.wav") # create filepath
-            torchaudio.save(path, signal[:, starting_frame:(starting_frame + window_size)], sample_rate = sample_rate, format = "wav") # save chop as .wav file
-            origin_filepaths.append(data.at[i, "path"]) # add original filepath to origin_filepaths
-            output_filepaths.append(path) # add filepath to output_filepaths
-            tempos.append(data.at[i, "tempo"]) # add tempo to tempos
+            output_filepath = join(AUDIO_DIR, f"{i}_{j}.wav") # create filepath
+            torchaudio.save(output_filepath, signal[:, starting_frame:(starting_frame + window_size)], sample_rate = sample_rate, format = "wav") # save chop as .wav file
+            origin_filepaths.append(origin_filepath) # add original filepath to origin_filepaths
+            output_filepaths.append(output_filepath) # add filepath to output_filepaths
+            tempos.append(tempo) # add tempo to tempos
         
     # write to OUTPUT_FILEPATH
     data = data.rename(columns = {"path": "path_origin"}).drop(columns = ["tempo"]) # rename path column in the original dataframe

@@ -53,7 +53,7 @@ with torch.no_grad():
     tempo_nn.eval()
 
     # validation loop
-    error = torch.Tensor().to(device)
+    error = torch.tensor(data = [], dtype = torch.float32).to(device)
     for inputs, labels in tqdm(data_loader, desc = "Making predictions"):
 
         # register inputs and labels with device

@@ -69,14 +69,16 @@ class tempo_nn(torch.nn.Module):
             checkpoint = torch.load(nn_filepath, map_location = device)
             self.model.load_state_dict(checkpoint["state_dict"], strict = False)
 
-        # freeze layers according to freeze_pretrained argument
-        for parameter in self.model.parameters(): # by default, all layers are frozen
-            parameter.requires_grad = False
-        if freeze_pretrained is not None:
-            for parameter in self.model.fc.parameters(): # create the distinction between my layers and the pretrained layers by unfreezing my layers (freeze_pretrained == True)
+        # freeze layers according to freeze_pretrained argument, by default all layers require gradient
+        for parameter in self.model.parameters(): # unfreeze all layers
                 parameter.requires_grad = True
-            if not freeze_pretrained: # if (freeze_pretrained == False), switch all values such that the pretrained layers require a gradient and the output regression layer does not
-                for parameter in self.model.parameters(): # create the distinction between my layers and the pretrained layers
+        if freeze_pretrained is not None:
+            # freeze_pretrained == False
+            for parameter in self.model.fc.parameters(): # create the distinction between my layers and the pretrained layers by freezing my layers (freeze_pretrained == False)
+                parameter.requires_grad = False
+            # freeze_pretrained == True
+            if freeze_pretrained: # if (freeze_pretrained == True), switch all values such that the pretrained layers do not requires_grad and the output regression layer does
+                for parameter in self.model.parameters():
                     parameter.requires_grad = not (parameter.requires_grad)
         
         # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear 1 -> linear 2 -> output
@@ -245,7 +247,7 @@ if __name__ == "__main__":
             tempo_nn.eval()
 
             # validation loop
-            error_validate = torch.Tensor().to(device)
+            error_validate = torch.tensor(data = [], dtype = torch.float32).to(device)
             for inputs, labels in tqdm(data_loader["validate"], desc = "Validating"):
 
                 # register inputs and labels with device
