@@ -51,14 +51,14 @@ except (IndexError, ValueError): # in case there is no epochs argument or there 
 
 # NEURAL NETWORK CLASS
 ##################################################
-use_pretrained_model = True
+USE_PRETRAINED = True
 class tempo_nn(torch.nn.Module):
 
     def __init__(self, nn_filepath, device, freeze_pretrained = None):
         super().__init__()
 
-        if use_pretrained_model:
-        # initialize pretrained model from pytorch, setting pretrained to True
+        if USE_PRETRAINED:
+            # initialize pretrained model from pytorch, setting pretrained to True
             self.model = resnet50(weights = ResNet50_Weights.DEFAULT)
 
             # change the final layer of the model to match my problem, change depending on the transfer learning model being used
@@ -96,7 +96,7 @@ class tempo_nn(torch.nn.Module):
             self.output = torch.nn.Linear(in_features = 10, out_features = 1)
 
     def forward(self, input_data):
-        if use_pretrained_model:
+        if USE_PRETRAINED:
             output = self.model(input_data)
         else:
             x = self.conv1(input_data)
