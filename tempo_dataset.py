@@ -20,6 +20,7 @@ from torch.utils.data import Dataset # base dataset class to create datasets
 import torchaudio
 import torchvision.transforms
 import pandas as pd
+from statsmodels.tsa.stattools import acf
 # sys.argv = ("./tempo_dataset.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_key_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Volumes/Seagate/artificial_dj_data/tempo_data")
 ##################################################
 
@@ -29,8 +30,10 @@ import pandas as pd
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 10.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between the start of each .wav file
-N_FFT = min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // 224) # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
-N_MELS = 128 # for waveform to melspectrogram transformation
+TORCHVISION_MIN_IMAGE_DIM = 224 # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
+IMAGE_HEIGHT = 256
+N_MELS = IMAGE_HEIGHT // 2 # for waveform to melspectrogram transformation
+TEMPO_RANGE = tuple(85 * i for i in (1, 2)) # set the minimum tempo, this will create a range of non-duplicate tempos (exclusive, inclusive)
 SET_TYPES = {"train": 0.7, "validate": 0.2, "test": 0.1} # train-validation-test fractions
 ##################################################
 
@@ -62,6 +65,16 @@ class tempo_dataset(Dataset):
         # self.sample_duration = sample_duration # not being used right now
         self.device = device
 
+        # determine constants for melspectrogram and acf
+        n_bins_per_beat_at_max_tempo = 20 # cannot exceed (60 / TEMPO_RANGE[1]) * SAMPLE_RATE; increase to increase resolution of acf
+        bin_length = max((60 / TEMPO_RANGE[1]) / n_bins_per_beat_at_max_tempo, 1 / SAMPLE_RATE) # length (in seconds) of each time-bin in the mel spectrogram; edit the term outside the parentheses (directly related to n_lags)
+        self.n_lags = int(((60 / TEMPO_RANGE[0]) * 1.5) / bin_length) + 1 # number of lags for autocorrelation function
+        self.n_fft = int(2 * bin_length * SAMPLE_RATE) # enter in number of time-bins before applying autocorrelation function; previously min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // TORCHVISION_MIN_IMAGE_DIM)
+
+        # instantiate transformation functions  
+        self.mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = self.n_fft, n_mels = N_MELS).to(self.device) # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / n_fft) > 224
+        self.normalize = torchvision.transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]).to(self.device) # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
+
     def __len__(self):
         return len(self.data)
 
@@ -92,17 +105,35 @@ class tempo_dataset(Dataset):
         # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
 
         # convert waveform to melspectrogram
-        # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / (n_fft)) > 224
-        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = N_FFT, n_mels = N_MELS).to(self.device)
-        signal = mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 64, ceil((SAMPLE_DURATION * SAMPLE_RATE) / (n_fft = 1024)) = 431)
-        signal = torch.repeat_interleave(input = signal, repeats = 256 // N_MELS, dim = 1) # make image height satisfy PyTorch image processing requirements, (1, 256, 431)
+        signal = self.mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 128, ceil((SAMPLE_DURATION * SAMPLE_RATE) / n_fft) = 431)
+        # import matplotlib.pyplot as plt # plot melspectrogram + acf
+        # fig, (ms, acf_plot) = plt.subplots(ncols = 2, figsize = (12, 8))
+        # fig.suptitle(f"Audio Preprocessing @ 100 BPM, bin_length = {bin_length:.3f}")
+        # ms_signal = signal
+        # ms.imshow(ms_signal[0], aspect = "auto", origin = "lower", cmap = "Greys")
+        # ms.set_xlabel("Bins")
+        # ms.set_ylabel("Frequency (mels)")
+        # ms.set_title("Melspectrogram")
+
+        # apply autocorrelation function, (1, 128, 431) -> (1, 128, 224)        
+        signal = melspectrogram_to_acf(signal = signal, n_lags = self.n_lags, device = self.device)
+        # acf_plot.imshow(signal[0], aspect = "auto", origin = "lower", cmap = "Greys")
+        # acf_plot.set_xlabel("Lag")
+        # acf_plot.sharey(other = ms)
+        # acf_plot.set_title("Autocorrelation Function")
+        # fig.savefig("/Users/philliplong/Desktop/plot.png", dpi = 240)
+
+        # because acf is correlation, meaning its values span from -1 to 1 (inclusive), min-max normalize such that the pixel values span from 0 to 255 (also inclusive)
+        signal = (signal + 1) * (255 / 2)
+
+        # make image height satisfy PyTorch image processing requirements, (1, 128, 224) -> (1, 256, 224)
+        signal = torch.repeat_interleave(input = signal, repeats = IMAGE_HEIGHT // N_MELS, dim = 1)
 
         # convert from 1 channel to 3 channels (mono -> RGB); I will treat this as an image classification problem
-        signal = torch.repeat_interleave(input = signal, repeats = 3, dim = 0) # (3 channels, # of mels, # of time samples) = (3, 256, 431)
+        signal = torch.repeat_interleave(input = signal, repeats = 3, dim = 0) # (3 channels, # of mels, # of time samples) = (3, 256, 224)
 
         # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
-        normalize = torchvision.transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]).to(self.device)
-        signal = normalize(signal)
+        signal = self.normalize(signal)
 
         return signal
     
@@ -151,6 +182,13 @@ def _edit_duration_if_necessary(signal, sample_rate, target_duration):
         signal = torch.nn.functional.pad(signal, pad = last_dim_padding, value = 0)
     return signal
 
+# autocorrelation function, takes the Mel Spectrogram as input (3-dimensional tensor) and returns a 3-d tensor with an acf applied to each mel (dim = 1)
+def melspectrogram_to_acf(signal, n_lags, device):
+    signal_acf = torch.empty(size = signal.shape[:2] + (n_lags,), dtype = signal.dtype) # define empty tensor to store values in and return
+    for n_mel in range(signal.size(1)): # compute acf at each mel bin
+        signal_acf[0, n_mel] = torch.tensor(data = acf(x = signal[0, n_mel].tolist(), nlags = n_lags - 1), dtype = signal.dtype) # compute acf, convert to tensor, store in output
+    return signal_acf.to(device) # re-register with device since tensor was coverted to numpy and back
+
 # given a mono signal, return the sample #s for which the song begins and ends (trimming silence)
 def _trim_silence(signal, sample_rate, window_size = 0.1): # window_size = size of rolling window (in SECONDS)
     # preprocess signal
@@ -166,6 +204,15 @@ def _trim_silence(signal, sample_rate, window_size = 0.1): # window_size = size 
     start_frame = starting_frames[is_silence.index(False)] if sum(is_silence) != len(is_silence) else 0 # get starting frame of audible audio
     end_frame = starting_frames[len(is_silence) - is_silence[::-1].index(False) - 1] if sum(is_silence) != len(is_silence) else 0 # get ending from of audible audio
     return start_frame, end_frame
+
+# fix duplicate tempos (e.g. 60 BPM is equivalent to 120 BPM)
+def fix_duplicate_tempo(tempo):
+    tempo = float(tempo) # convert to float in case
+    while tempo <= TEMPO_RANGE[0]:
+        tempo *= 2
+    while tempo > TEMPO_RANGE[1]:
+        tempo /= 2
+    return tempo
 
 ##################################################
 
@@ -223,7 +270,7 @@ if __name__ == "__main__":
         window_size = int(SAMPLE_DURATION * sample_rate) # convert window size from seconds to frames
         starting_frames = tuple(range(start_frame, end_frame - window_size, int(STEP_SIZE * sample_rate))) # get frame numbers for which each chop starts
         origin_filepath = data.at[i, "path"] # set original filepath
-        tempo = data.at[i, "tempo"] # set the tempo
+        tempo = fix_duplicate_tempo(tempo = data.at[i, "tempo"]) # set the tempo
         for j, starting_frame in enumerate(starting_frames):
             output_filepath = join(AUDIO_DIR, f"{i}_{j}.wav") # create filepath
             torchaudio.save(output_filepath, signal[:, starting_frame:(starting_frame + window_size)], sample_rate = sample_rate, format = "wav") # save chop as .wav file
@@ -259,3 +306,13 @@ if __name__ == "__main__":
     print(f"The artist of the 0th sample is {tempo_data.get_info(0)['artist']}.")
 
     ##################################################
+
+
+# CODE FOR FIXING DUPLICATE TEMPOS IN HINDSIGHT
+##################################################
+
+# tempo_data = pd.read_csv(OUTPUT_FILEPATH, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
+# tempo_data["tempo"] = tempo_data["tempo"].apply(fix_duplicate_tempo)
+# tempo_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
+
+##################################################
