@@ -126,6 +126,9 @@ class tempo_dataset(Dataset):
         # because acf is correlation, meaning its values span from -1 to 1 (inclusive), min-max normalize such that the pixel values span from 0 to 255 (also inclusive)
         signal = (signal + 1) * (255 / 2)
 
+        # make image width satisfy PyTorch image processing requirements
+        signal = torch.repeat_interleave(input = signal, repeats = (TORCHVISION_MIN_IMAGE_DIM // signal.size(2)) + 1, dim = 2)
+
         # make image height satisfy PyTorch image processing requirements, (1, 128, 224) -> (1, 256, 224)
         signal = torch.repeat_interleave(input = signal, repeats = IMAGE_HEIGHT // N_MELS, dim = 1)
 
