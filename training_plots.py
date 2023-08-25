@@ -51,7 +51,7 @@ freeze_pretrained_epochs[-1] += 1 # add one to the last epoch, since it is a rep
 # plot loss and percentiles per epoch
 fig, axes = plt.subplot_mosaic(mosaic = [["loss", "percentiles_history"], ["accuracy", "percentiles_history"]], constrained_layout = True, figsize = (12, 8))
 fig.suptitle("Tempo Neural Network")
-colors = ["tab:blue", "tab:red", "tab:orange", "tab:green", "tab:purple", "tab:brown", "tab:pink", "tab:gray", "tab:olive", "tab:cyan"]
+colors = ("tab:blue", "tab:red", "tab:orange", "tab:green", "tab:purple", "tab:brown", "tab:pink", "tab:gray", "tab:olive", "tab:cyan")
 
 # add freeze_pretrained legend
 freeze_pretrained_edgecolor = str(0.6 * min(float(freeze_pretrained_alpha(freeze_pretrained = True)), float(freeze_pretrained_alpha(freeze_pretrained = False))))
