@@ -31,9 +31,15 @@ SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 10.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between the start of each .wav file
 TORCHVISION_MIN_IMAGE_DIM = 224 # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
-IMAGE_HEIGHT = 256
+IMAGE_HEIGHT = 256 # height of the resulting image after transforms are applied
 N_MELS = IMAGE_HEIGHT // 2 # for waveform to melspectrogram transformation
 TEMPO_RANGE = tuple(85 * i for i in (1, 2)) # set the minimum tempo, this will create a range of non-duplicate tempos (exclusive, inclusive)
+# determine constants for melspectrogram and acf
+N_BINS_PER_BEAT_AT_MAX_TEMPO = 20 # cannot exceed (60 / TEMPO_RANGE[1]) * SAMPLE_RATE; increase to increase resolution of acf
+BIN_LENGTH = max((60 / TEMPO_RANGE[1]) / N_BINS_PER_BEAT_AT_MAX_TEMPO, 1 / SAMPLE_RATE) # length (in seconds) of each time-bin in the mel spectrogram; edit the term outside the parentheses (directly related to n_lags)
+ACF_EXTENDS_N_TIMES_PAST_BEAT_AT_MIN_TEMPO = 1.5 # at the slowest tempo, the ACF should cover one beat plus some certain amount; this value is how many times longer the ACF should extend than the beat at the slowest tempo
+N_LAGS = int(((60 / TEMPO_RANGE[0]) * ACF_EXTENDS_N_TIMES_PAST_BEAT_AT_MIN_TEMPO) / BIN_LENGTH) + 1 # number of lags for autocorrelation function
+N_FFT = int(2 * BIN_LENGTH * SAMPLE_RATE) # enter in number of time-bins before applying autocorrelation function; previously min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // TORCHVISION_MIN_IMAGE_DIM); number of samples in each bin on the mel spectrogram
 SET_TYPES = {"train": 0.7, "validate": 0.2, "test": 0.1} # train-validation-test fractions
 ##################################################
 
@@ -43,7 +49,7 @@ SET_TYPES = {"train": 0.7, "validate": 0.2, "test": 0.1} # train-validation-test
 
 class tempo_dataset(Dataset):
 
-    def __init__(self, labels_filepath, set_type, device, target_sample_rate = SAMPLE_RATE, sample_duration = SAMPLE_DURATION, use_pseudo_replicates = True):
+    def __init__(self, labels_filepath, set_type, device, use_pseudo_replicates = True):
         # set_type can take on one of three values: ("train", "validate", "test")
 
         # import labelled data file, preprocess
@@ -61,18 +67,10 @@ class tempo_dataset(Dataset):
         self.data = self.data.iloc[_partition(n = len(self.data))[set_type]].reset_index(drop = True) # extract range depending on set_type, also reset indicies
         
         # import constants
-        # self.target_sample_rate = target_sample_rate # not being used right now
-        # self.sample_duration = sample_duration # not being used right now
         self.device = device
 
-        # determine constants for melspectrogram and acf
-        n_bins_per_beat_at_max_tempo = 20 # cannot exceed (60 / TEMPO_RANGE[1]) * SAMPLE_RATE; increase to increase resolution of acf
-        bin_length = max((60 / TEMPO_RANGE[1]) / n_bins_per_beat_at_max_tempo, 1 / SAMPLE_RATE) # length (in seconds) of each time-bin in the mel spectrogram; edit the term outside the parentheses (directly related to n_lags)
-        self.n_lags = int(((60 / TEMPO_RANGE[0]) * 1.5) / bin_length) + 1 # number of lags for autocorrelation function
-        self.n_fft = int(2 * bin_length * SAMPLE_RATE) # enter in number of time-bins before applying autocorrelation function; previously min(1024, (2 * SAMPLE_DURATION * SAMPLE_RATE) // TORCHVISION_MIN_IMAGE_DIM)
-
         # instantiate transformation functions  
-        self.mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = self.n_fft, n_mels = N_MELS).to(self.device) # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / n_fft) > 224
+        self.mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = N_FFT, n_mels = N_MELS).to(self.device) # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / n_fft) > 224
         self.normalize = torchvision.transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]).to(self.device) # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
 
     def __len__(self):
@@ -84,7 +82,7 @@ class tempo_dataset(Dataset):
         # register signal onto device (gpu [cuda] or cpu)
         signal = signal.to(self.device)
         # apply transformations
-        signal = self._transform(signal = signal)
+        signal = self._transform(signal = signal, sample_rate = sample_rate)
         # return the transformed signal and the actual BPM
         return signal, torch.tensor([self.data.at[index, "tempo"]], dtype = torch.float32)
     
@@ -93,35 +91,22 @@ class tempo_dataset(Dataset):
         return self.data.loc[index, ["title", "artist", "path_origin", "path", "tempo", "key"]].to_dict()
     
     # transform a waveform into whatever will be used to train a neural network
-    def _transform(self, signal):
+    def _transform(self, signal, sample_rate):
 
         # resample; sample_rate was already set in preprocessing
-        # signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = self.target_sample_rate, device = self.device) # resample for consistent sample rate
+        # signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = SAMPLE_RATE, device = self.device) # resample for consistent sample rate
         
         # convert from stereo to mono; already done in preprocessing
         # signal = _mix_down_if_necessary(signal = signal)
 
         # pad/crop for fixed signal duration; duration was already set in preprocessing
-        # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = self.sample_duration) # crop/pad if signal is too long/short
+        # signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = SAMPLE_DURATION) # crop/pad if signal is too long/short
 
         # convert waveform to melspectrogram
         signal = self.mel_spectrogram(signal) # (single channel, # of mels, # of time samples) = (1, 128, ceil((SAMPLE_DURATION * SAMPLE_RATE) / n_fft) = 431)
-        # import matplotlib.pyplot as plt # plot melspectrogram + acf
-        # fig, (ms, acf_plot) = plt.subplots(ncols = 2, figsize = (12, 8))
-        # fig.suptitle(f"Audio Preprocessing @ 100 BPM, bin_length = {bin_length:.3f}")
-        # ms_signal = signal
-        # ms.imshow(ms_signal[0], aspect = "auto", origin = "lower", cmap = "Greys")
-        # ms.set_xlabel("Bins")
-        # ms.set_ylabel("Frequency (mels)")
-        # ms.set_title("Melspectrogram")
 
         # apply autocorrelation function, (1, 128, 431) -> (1, 128, 224)        
-        signal = melspectrogram_to_acf(signal = signal, n_lags = self.n_lags, device = self.device)
-        # acf_plot.imshow(signal[0], aspect = "auto", origin = "lower", cmap = "Greys")
-        # acf_plot.set_xlabel("Lag")
-        # acf_plot.sharey(other = ms)
-        # acf_plot.set_title("Autocorrelation Function")
-        # fig.savefig("/Users/philliplong/Desktop/plot.png", dpi = 240)
+        signal = _melspectrogram_to_acf(signal = signal, n_lags = N_LAGS, device = self.device)
 
         # because acf is correlation, meaning its values span from -1 to 1 (inclusive), min-max normalize such that the pixel values span from 0 to 255 (also inclusive)
         signal = (signal + 1) * (255 / 2)
@@ -138,8 +123,9 @@ class tempo_dataset(Dataset):
         # normalize the image according to PyTorch docs (https://pytorch.org/vision/0.8/models.html)
         signal = self.normalize(signal)
 
+        # return the signal as a transformed tensor registered to the correct device
         return signal
-    
+
     # sample n_predictions random rows from data, return a tensor of the audios and a tensor of the labels
     # def sample(self, n_predictions):
     #     inputs_targets = [self.__getitem__(index = i) for i in self.data.sample(n = n_predictions, replace = False, ignore_index = False).index]
@@ -171,7 +157,7 @@ def _resample_if_necessary(signal, sample_rate, new_sample_rate, device):
 
 # convert from stereo to mono
 def _mix_down_if_necessary(signal):
-    if signal.shape[0] > 1: # signal.shape[0] = # of channels; if # of channels is more than one, it is stereo, so convert to mono
+    if signal.size(0) > 1: # signal.size(0) = # of channels; if # of channels is more than one, it is stereo, so convert to mono
         signal = torch.mean(signal, dim = 0, keepdim = True)
     return signal
 
@@ -186,7 +172,7 @@ def _edit_duration_if_necessary(signal, sample_rate, target_duration):
     return signal
 
 # autocorrelation function, takes the Mel Spectrogram as input (3-dimensional tensor) and returns a 3-d tensor with an acf applied to each mel (dim = 1)
-def melspectrogram_to_acf(signal, n_lags, device):
+def _melspectrogram_to_acf(signal, n_lags, device):
     signal_acf = torch.empty(size = signal.shape[:2] + (n_lags,), dtype = signal.dtype) # define empty tensor to store values in and return
     for n_mel in range(signal.size(1)): # compute acf at each mel bin
         signal_acf[0, n_mel] = torch.tensor(data = acf(x = signal[0, n_mel].tolist(), nlags = n_lags - 1), dtype = signal.dtype) # compute acf, convert to tensor, store in output
@@ -311,11 +297,67 @@ if __name__ == "__main__":
     ##################################################
 
 
-# CODE FOR FIXING DUPLICATE TEMPOS IN HINDSIGHT
-##################################################
+    # CODE FOR FIXING DUPLICATE TEMPOS IN HINDSIGHT
+    ##################################################
 
-# tempo_data = pd.read_csv(OUTPUT_FILEPATH, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
-# tempo_data["tempo"] = tempo_data["tempo"].apply(fix_duplicate_tempo)
-# tempo_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
+    # tempo_data = pd.read_csv(OUTPUT_FILEPATH, sep = "\t", header = 0, index_col = False, keep_default_na = False, na_values = "NA")
+    # tempo_data["tempo"] = tempo_data["tempo"].apply(fix_duplicate_tempo)
+    # tempo_data.to_csv(OUTPUT_FILEPATH, sep = "\t", header = True, index = False, na_rep = "NA") # write output
 
-##################################################
+    ##################################################
+
+
+    # MAKE PLOT TO SHOW PREPROCESSING TRANSFORMS
+    ##################################################
+
+    def make_preprocessing_plot(audio_filepath, output_filepath):
+        # imports
+        import matplotlib.pyplot as plt
+        from numpy import arange, linspace
+
+        # some constants
+        device = "cpu" # perform computation on cpu
+
+        # load in audio file
+        signal, sample_rate = torchaudio.load(audio_filepath, format = "wav") # returns the waveform data and sample rate
+        # register signal onto device (gpu [cuda] or cpu)
+        signal = signal.to(device)
+        # resample; sample_rate was already set in preprocessing
+        signal, sample_rate = _resample_if_necessary(signal = signal, sample_rate = sample_rate, new_sample_rate = SAMPLE_RATE, device = device) # resample for consistent sample rate
+        # convert from stereo to mono; already done in preprocessing
+        signal = _mix_down_if_necessary(signal = signal)
+        # pad/crop for fixed signal duration; duration was already set in preprocessing
+        signal = _edit_duration_if_necessary(signal = signal, sample_rate = sample_rate, target_duration = SAMPLE_DURATION) # crop/pad if signal is too long/short
+        # convert waveform to melspectrogram
+        mel_spectrogram = torchaudio.transforms.MelSpectrogram(sample_rate = SAMPLE_RATE, n_fft = N_FFT, n_mels = N_MELS).to(device) # make sure to adjust MelSpectrogram parameters such that # of mels > 224 and ceil((2 * SAMPLE_DURATION * SAMPLE_RATE) / n_fft) > 224
+        signal = mel_spectrogram(signal)
+
+        # create plot
+        fig, (ms_plot, acf_plot) = plt.subplots(nrows = 1, ncols = 2, layout = "constrained", figsize = (12, 8))
+        fig.suptitle(f"Audio Preprocessing")
+
+        # plot melspectrogam
+        ms_plot_temp = ms_plot.imshow(signal[0], aspect = "auto", origin = "lower", cmap = "plasma")
+        fig.colorbar(ms_plot_temp, ax = ms_plot, label = "Amplitude", location = "top")
+        ms_plot.set_xticks(ticks = arange(start = 0, stop = signal.size(2) + 1, step = signal.size(2) / 10), labels = arange(start = 0, stop = 10 + 1, step = 1))
+        ms_plot.set_xlabel("Time (seconds)")
+        ms_plot.set_ylabel("Frequency (mels)")
+        ms_plot.set_title("Melspectrogram")
+
+        # apply autocorrelation function      
+        signal = _melspectrogram_to_acf(signal = signal, n_lags = N_LAGS, device = device)
+
+        # plot autocorrelation function
+        acf_plot_temp = acf_plot.imshow(signal[0], aspect = "auto", origin = "lower", cmap = "Greys")
+        fig.colorbar(acf_plot_temp, ax = acf_plot, label = "Correlation", location = "top")
+        last_label = round((N_LAGS * BIN_LENGTH) * 10) / 10
+        acf_plot.set_xticks(ticks = linspace(start = 0, stop = (signal.size(2) * last_label) / (N_LAGS * BIN_LENGTH), num = int(last_label * 10) + 1), labels = (f"{num:.1f}" for num in arange(start = 0, stop = last_label + 0.01, step = 0.1)))
+        acf_plot.set_xlabel("Time (seconds)")
+        acf_plot.sharey(other = ms_plot)
+        acf_plot.set_title("Autocorrelation Function")
+
+        # save figure
+        fig.savefig(output_filepath, dpi = 240)
+        print(f"Saved plot to {output_filepath}.")
+
+    ##################################################
