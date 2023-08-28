@@ -159,12 +159,8 @@ if __name__ == "__main__":
 
     # STARTING BEST ACCURACY, ADJUST IF NEEDED
     best_accuracy = 1e+24 # make sure to adjust for different accuracy metrics
-    def compute_error(predictions, labels): # calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
-        predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32)
-        error = torch.abs(input = predictions.view(-1) - labels.view(-1)).view(-1)
-        return error
     def labels_to_tempo_indicies(labels): # convert raw labels (floats in BPM) into class indicies
-        return torch.tensor(data = list(map(lambda label: get_tempo_index(tempo = label), labels)), dtype = torch.uint8).view_as(other = labels)
+        return torch.tensor(data = list(map(lambda label: get_tempo_index(tempo = label), labels)), dtype = torch.uint8).view(-1) # https://stackoverflow.com/questions/71399847/runtimeerror-0d-or-1d-target-tensor-expected-multi-target-not-supported-i-was
     
     # history of losses and accuracy
     history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy", "freeze_pretrained")
@@ -278,7 +274,9 @@ if __name__ == "__main__":
                 history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
 
                 # add accuracy to running count of all the errors in the validation dataset
-                error_validate = torch.cat(tensors = (error_validate, compute_error(predictions = predictions, labels = raw_labels).to(device)), dim = 0)
+                predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32).to(device) # convert predicted indicies into actual predicted tempos
+                error_batch = torch.abs(input = predictions.view(-1) - raw_labels.view(-1)) # get absolute error
+                error_validate = torch.cat(tensors = (error_validate, error_batch), dim = 0) # append to error validate
 
         ##################################################
 

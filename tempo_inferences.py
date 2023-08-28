@@ -45,12 +45,6 @@ print("Imported neural network parameters.")
 data = tempo_dataset(labels_filepath = LABELS_FILEPATH, set_type = "test", device = device)
 data_loader = DataLoader(dataset = data, batch_size = BATCH_SIZE, shuffle = True)
 
-# calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
-def compute_error(predictions, labels):
-    predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32)
-    error = torch.abs(input = predictions.view(-1) - labels.view(-1).type(torch.float32)).view(-1)
-    return error
-
 # make an inference
 with torch.no_grad():
             
@@ -69,7 +63,9 @@ with torch.no_grad():
         predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1) # convert to class indicies
     
         # add error to running count of all the errors in the validation dataset
-        error = torch.cat(tensors = (error, compute_error(predictions = predictions, labels = labels).to(device)), dim = 0)
+        predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32).to(device) # convert predicted indicies into actual predicted tempos
+        error_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
+        error = torch.cat(tensors = (error, error_batch), dim = 0)
 
 print("----------------------------------------------------------------")
 

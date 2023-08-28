@@ -18,6 +18,7 @@ echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
+output_prefix="${data}/tempo_nn.classification"
 
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
@@ -27,4 +28,4 @@ eval "$(/opt/apps/miniconda3/4.12.0/bin/conda 'shell.bash' 'hook')"
 conda activate artificial_dj
 
 # run python script
-python "${artificial_dj}/determine_tempo/tempo_inferences.py" "${data}/tempo_data.cluster.tsv" "${data}/tempo_nn.pretrained.pth"
+python "${artificial_dj}/determine_tempo/tempo_inferences.py" "${data}/tempo_data.cluster.tsv" "${output_prefix}.pth"
