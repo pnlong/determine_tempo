@@ -11,13 +11,12 @@
 # IMPORTS
 ##################################################
 import sys
-from os.path import join, dirname
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from numpy import percentile
 import matplotlib.pyplot as plt
-from tempo_dataset import tempo_dataset # import dataset class
+from tempo_dataset import tempo_dataset, get_tempo # import dataset class
 from tempo_neural_network import tempo_nn, BATCH_SIZE # import neural network class
 # sys.argv = ("./tempo_inferences.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
 ##################################################
@@ -46,6 +45,12 @@ print("Imported neural network parameters.")
 data = tempo_dataset(labels_filepath = LABELS_FILEPATH, set_type = "test", device = device)
 data_loader = DataLoader(dataset = data, batch_size = BATCH_SIZE, shuffle = True)
 
+# calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
+def compute_error(predictions, labels):
+    predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32)
+    error = torch.abs(input = predictions.view(-1) - labels.view(-1).type(torch.float32)).view(-1)
+    return error
+
 # make an inference
 with torch.no_grad():
             
@@ -61,9 +66,10 @@ with torch.no_grad():
 
         # forward pass: compute predictions on input data using the model
         predictions = tempo_nn(inputs)
+        predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1) # convert to class indicies
     
         # add error to running count of all the errors in the validation dataset
-        error = torch.cat(tensors = (error, torch.abs(input = predictions.view(-1) - labels.view(-1))), dim = 0)
+        error = torch.cat(tensors = (error, compute_error(predictions = predictions, labels = labels).to(device)), dim = 0)
 
 print("----------------------------------------------------------------")
 

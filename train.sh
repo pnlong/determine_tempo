@@ -17,14 +17,14 @@ echo "JOB ID: ${SLURM_JOBID}"
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
-output_prefix="${data}/tempo_nn.pretrained_activation"
+output_prefix="${data}/tempo_nn.classification"
 
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"
 
 # set number of epochs and freeze_pretrained
 epochs="default"
-freeze_pretrained="default"
+freeze_pretrained="True"
 while getopts e:f: opt
 do
     case "${opt}" in

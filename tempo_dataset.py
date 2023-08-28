@@ -30,10 +30,11 @@ from statsmodels.tsa.stattools import acf
 SAMPLE_RATE = 44100 // 2
 SAMPLE_DURATION = 10.0 # in seconds
 STEP_SIZE = SAMPLE_DURATION / 2 # in seconds, the amount of time between the start of each .wav file
+TEMPO_RANGE = tuple(85 * i for i in (1, 2)) # set the minimum tempo, this will create a range of non-duplicate tempos (exclusive, inclusive)
+TEMPO_MAPPINGS = tuple(range(TEMPO_RANGE[0], TEMPO_RANGE[1] + 1))
 TORCHVISION_MIN_IMAGE_DIM = 224 # 224 is the minimum image width for PyTorch image processing, for waveform to melspectrogram transformation
 IMAGE_HEIGHT = 256 # height of the resulting image after transforms are applied
 N_MELS = IMAGE_HEIGHT // 2 # for waveform to melspectrogram transformation
-TEMPO_RANGE = tuple(85 * i for i in (1, 2)) # set the minimum tempo, this will create a range of non-duplicate tempos (exclusive, inclusive)
 # determine constants for melspectrogram and acf
 N_BINS_PER_BEAT_AT_MAX_TEMPO = 20 # cannot exceed (60 / TEMPO_RANGE[1]) * SAMPLE_RATE; increase to increase resolution of acf
 BIN_LENGTH = max((60 / TEMPO_RANGE[1]) / N_BINS_PER_BEAT_AT_MAX_TEMPO, 1 / SAMPLE_RATE) # length (in seconds) of each time-bin in the mel spectrogram; edit the term outside the parentheses (directly related to n_lags)
@@ -202,6 +203,23 @@ def fix_duplicate_tempo(tempo):
     while tempo > TEMPO_RANGE[1]:
         tempo /= 2
     return tempo
+
+##################################################
+
+
+# ACCESSOR METHODS
+##################################################
+
+# TEMPO
+# get the tempo index from tempo
+def get_tempo_index(tempo):
+    tempo = fix_duplicate_tempo(tempo = tempo)
+    # return TEMPO_MAPPINGS.index(int(round(fix_duplicate_tempo(tempo = tempo)))) # works when TEMPO_MAPPINGS are whole numbers
+    return min(range(len(TEMPO_MAPPINGS)), key = lambda i: abs(tempo - TEMPO_MAPPINGS[i])) # more versatile
+
+# get the tempo from the tempo index
+def get_tempo(index):
+    return float(TEMPO_MAPPINGS[index])
 
 ##################################################
 

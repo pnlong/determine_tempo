@@ -21,7 +21,7 @@ from torchvision.models import resnet50, ResNet50_Weights
 from torchsummary import summary
 import pandas as pd
 from numpy import percentile
-from tempo_dataset import tempo_dataset # import dataset class
+from tempo_dataset import tempo_dataset, TEMPO_MAPPINGS, get_tempo, get_tempo_index # import dataset class
 # sys.argv = ("./tempo_neural_network.py", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_data.tsv", "/Users/philliplong/Desktop/Coding/artificial_dj/data/tempo_nn.pth")
 # sys.argv = ("./tempo_neural_network.py", "/dfs7/adl/pnlong/artificial_dj/data/tempo_data.cluster.tsv", "/dfs7/adl/pnlong/artificial_dj/data/tempo_nn.pth")
 ##################################################
@@ -30,17 +30,15 @@ from tempo_dataset import tempo_dataset # import dataset class
 # CONSTANTS
 ##################################################
 BATCH_SIZE = 32
-# LEARNING_RATE = 1e-3
-# freeze pretrained parameters (true = freeze pretrained, false = unfreeze pretrained, freeze my parameters)
+LEARNING_RATE = 1e-3
+# freeze pretrained parameters (true = freeze pretrained, false = unfreeze pretrained)
 try:
-    if sys.argv[3].lower().startswith("t"):
-        FREEZE_PRETRAINED = True
-    elif sys.argv[3].lower().startswith("f"):
+    if sys.argv[3].lower().startswith("f"):
         FREEZE_PRETRAINED = False
     else:
-        FREEZE_PRETRAINED = None
+        FREEZE_PRETRAINED = True
 except (IndexError):
-    FREEZE_PRETRAINED = None
+    FREEZE_PRETRAINED = True
 # number of epochs to train
 try:
     EPOCHS = max(0, int(sys.argv[4])) # in case of a negative number
@@ -63,9 +61,9 @@ class tempo_nn(torch.nn.Module):
 
             # change the final layer of the model to match my problem, change depending on the transfer learning model being used
             self.model.fc = torch.nn.Sequential(torch.nn.Linear(in_features = 2048, out_features = 1000), torch.nn.ReLU(),
-                                                torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU(),
-                                                torch.nn.Linear(in_features = 100, out_features = 10), torch.nn.ReLU(),
-                                                torch.nn.Linear(in_features = 10, out_features = 1)) # one output feature = one predicted value
+                                                torch.nn.Linear(in_features = 1000, out_features = 500), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 500, out_features = 100), torch.nn.ReLU(),
+                                                torch.nn.Linear(in_features = 100, out_features = len(TEMPO_MAPPINGS)))
 
             # try to load previously saved parameters
             if exists(nn_filepath):
@@ -74,15 +72,12 @@ class tempo_nn(torch.nn.Module):
 
             # freeze layers according to freeze_pretrained argument, by default all layers require gradient
             for parameter in self.model.parameters(): # unfreeze all layers
-                    parameter.requires_grad = True
-            if freeze_pretrained is not None:
-                # freeze_pretrained == False
-                for parameter in self.model.fc.parameters(): # create the distinction between my layers and the pretrained layers by freezing my layers (freeze_pretrained == False)
+                parameter.requires_grad = True
+            if freeze_pretrained:
+                for parameter in self.model.parameters(): # freeze all layers
                     parameter.requires_grad = False
-                # freeze_pretrained == True
-                if freeze_pretrained: # if (freeze_pretrained == True), switch all values such that the pretrained layers do not requires_grad and the output regression layer does
-                    for parameter in self.model.parameters():
-                        parameter.requires_grad = not (parameter.requires_grad)
+                for parameter in self.model.fc.parameters(): # unfreeze my layers
+                    parameter.requires_grad = True
 
         else:    
             # convolutional block 1 -> convolutional block 2 -> convolutional block 3 -> convolutional block 4 -> flatten -> linear block 1 -> linear block 2 -> output
@@ -91,13 +86,13 @@ class tempo_nn(torch.nn.Module):
             self.conv3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
             self.conv4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels = 64, out_channels = 128, kernel_size = 3, stride = 1, padding = 2), torch.nn.ReLU(), torch.nn.MaxPool2d(kernel_size = 2))
             self.flatten = torch.nn.Flatten(start_dim = 1)
-            self.linear1 = torch.nn.Sequential(torch.nn.Linear(in_features = 17920, out_features = 100), torch.nn.ReLU())
-            self.linear2 = torch.nn.Sequential(torch.nn.Linear(in_features = 100, out_features = 10), torch.nn.ReLU())
-            self.output = torch.nn.Linear(in_features = 10, out_features = 1)
+            self.linear1 = torch.nn.Sequential(torch.nn.Linear(in_features = 17920, out_features = 1000), torch.nn.ReLU())
+            self.linear2 = torch.nn.Sequential(torch.nn.Linear(in_features = 1000, out_features = 100), torch.nn.ReLU())
+            self.logits = torch.nn.Linear(in_features = 100, out_features = len(TEMPO_MAPPINGS))
 
     def forward(self, input_data):
         if USE_PRETRAINED:
-            output = self.model(input_data)
+            logits = self.model(input_data)
         else:
             x = self.conv1(input_data)
             x = self.conv2(x)
@@ -106,9 +101,8 @@ class tempo_nn(torch.nn.Module):
             x = self.flatten(x)
             x = self.linear1(x)
             x = self.linear2(x)
-            output = self.output(x)
-        
-        return output
+            logits = self.logits(x)
+        return logits
 
 ##################################################
 
@@ -153,8 +147,8 @@ if __name__ == "__main__":
     print("================================================================")
 
     # instantiate loss function and optimizer
-    loss_criterion = torch.nn.MSELoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
-    optimizer = torch.optim.Adam(tempo_nn.parameters()) # if I am not using a pretrained model, I need to specify lr = LEARNING_RATE
+    loss_criterion = torch.nn.CrossEntropyLoss() # make sure loss function agrees with the problem (see https://neptune.ai/blog/pytorch-loss-functions for more), assumes loss function is some sort of mean
+    optimizer = torch.optim.Adam(tempo_nn.parameters()) if USE_PRETRAINED else torch.optim.Adam(tempo_nn.parameters(), lr = LEARNING_RATE) # if I am not using a pretrained model, I need to specify lr = LEARNING_RATE
 
     # load previously trained info if applicable
     start_epoch = 0
@@ -165,7 +159,13 @@ if __name__ == "__main__":
 
     # STARTING BEST ACCURACY, ADJUST IF NEEDED
     best_accuracy = 1e+24 # make sure to adjust for different accuracy metrics
-
+    def compute_error(predictions, labels): # calculate closest distance at each prediction to actual note (for instance, a B is both 1 and 11 semitones away from C, pick the smaller (1 semitone))
+        predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32)
+        error = torch.abs(input = predictions.view(-1) - labels.view(-1)).view(-1)
+        return error
+    def labels_to_tempo_indicies(labels): # convert raw labels (floats in BPM) into class indicies
+        return torch.tensor(data = list(map(lambda label: get_tempo_index(tempo = label), labels)), dtype = torch.uint8).view_as(other = labels)
+    
     # history of losses and accuracy
     history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy", "freeze_pretrained")
     OUTPUT_FILEPATH_HISTORY = OUTPUT_PREFIX + ".history.tsv"
@@ -207,7 +207,7 @@ if __name__ == "__main__":
         for inputs, labels in tqdm(data_loader["train"], desc = "Training"):
 
             # register inputs and labels with device
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels_to_tempo_indicies(labels = labels).to(device)
             
             # clear existing gradients
             optimizer.zero_grad()
@@ -228,7 +228,9 @@ if __name__ == "__main__":
             history_epoch["train_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
             # compute the accuracy
-            accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
+            predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1).type(torch.uint8)
+            labels = labels.view(-1)
+            accuracy_batch = (predictions == labels)
 
             # compute the total accuracy for the batch and add it to history_epoch["train_accuracy"]
             history_epoch["train_accuracy"] += torch.sum(input = accuracy_batch).item()
@@ -255,8 +257,9 @@ if __name__ == "__main__":
             for inputs, labels in tqdm(data_loader["validate"], desc = "Validating"):
 
                 # register inputs and labels with device
-                inputs, labels = inputs.to(device), labels.to(device)
-
+                raw_labels = labels.to(device)
+                inputs, labels = inputs.to(device), labels_to_tempo_indicies(labels = labels).to(device)
+            
                 # forward pass: compute predictions on input data using the model
                 predictions = tempo_nn(inputs)
 
@@ -267,13 +270,15 @@ if __name__ == "__main__":
                 history_epoch["validate_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
                 # compute the accuracy
-                accuracy_batch = torch.abs(input = predictions.view(-1) - labels.view(-1))
+                predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1).type(torch.uint8)
+                labels = labels.view(-1)
+                accuracy_batch = (predictions == labels)
 
                 # compute the total accuracy for the batch and add it to history_epoch["validate_accuracy"]
                 history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
 
                 # add accuracy to running count of all the errors in the validation dataset
-                error_validate = torch.cat(tensors = (error_validate, accuracy_batch), dim = 0)
+                error_validate = torch.cat(tensors = (error_validate, compute_error(predictions = predictions, labels = raw_labels).to(device)), dim = 0)
 
         ##################################################
 
@@ -307,7 +312,7 @@ if __name__ == "__main__":
         # print out updates
         print(f"Training Time: {(total_time_epoch / 60):.1f} minutes")
         print(f"Training Loss: {history_epoch['train_loss']:.3f}, Validation Loss: {history_epoch['validate_loss']:.3f}")
-        print(f"Mean Training Error: {history_epoch['train_accuracy']:.3f}, Mean Validation Error: {history_epoch['validate_accuracy']:.3f}")
+        print(f"Training Accuracy: {100 * history_epoch['train_accuracy']:.3f}%, Validation Accuracy: {100 * history_epoch['validate_accuracy']:.3f}%")
         print(f"Five Number Summary of Validation Errors: {' '.join((f'{value:.2f}' for value in (percentile_values[percentile] for percentile in (0, 25, 50, 75, 100))))}")
 
         ##################################################
@@ -328,16 +333,16 @@ if __name__ == "__main__":
             train_an_epoch(epoch = epoch)
         print("================================================================")
 
-    # train
-    # start by training my section of the neural network for some epochs
+    # print what section is being trained
     if FREEZE_PRETRAINED:
         print("Training final regression layer...")
-        train_epochs(start = start_epoch, n = EPOCHS)
     elif not FREEZE_PRETRAINED:
         print("Fine-tuning pretrained layers...")
-        train_epochs(start = start_epoch, n = EPOCHS)
     else:
-        sys.exit("All parameters are frozen, so the model will not be trained. Exiting program...")
+        print("Training all layers...")
+    
+    # train epochs
+    train_epochs(start = start_epoch, n = EPOCHS)
 
     ##################################################
 
