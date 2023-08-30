@@ -1,19 +1,15 @@
 #!/bin/bash
 #SBATCH --job-name=test_tempo_nn        ## job name
-#SBATCH -A tdlong_lab_gpu               ## account to charge
-#SBATCH -p gpu                          ## run on the gpu partition
+#SBATCH -A tdlong_lab                   ## account to charge
+#SBATCH -p standard                     ## run on the standard cpu partition
 #SBATCH --nodes=1                       ## run on a single node
 #SBATCH --ntasks=1                      ## request 1 task
 #SBATCH --cpus-per-task=1               ## number of cores the job needs
-#SBATCH --gres=gpu:V100:1               ## request 1 gpu of type V100
-
-module load cuda/11.7.1
-echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
 
 # README
 # Phillip Long
 # August 20, 2023
-# script to test the neural network; request GPU partition
+# script to test the neural network; request CPU partition
 # assumes I have already run tempo_dataset.py and tempo_neural_network.py
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"

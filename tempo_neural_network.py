@@ -158,9 +158,9 @@ if __name__ == "__main__":
         start_epoch = int(checkpoint["epoch"]) + 1    
 
     # STARTING BEST ACCURACY, ADJUST IF NEEDED
-    best_accuracy = 1e+24 # make sure to adjust for different accuracy metrics
+    best_accuracy = 0.0 # make sure to adjust for different accuracy metrics
     def labels_to_tempo_indicies(labels): # convert raw labels (floats in BPM) into class indicies
-        return torch.tensor(data = list(map(lambda label: get_tempo_index(tempo = label), labels)), dtype = torch.uint8).view(-1) # https://stackoverflow.com/questions/71399847/runtimeerror-0d-or-1d-target-tensor-expected-multi-target-not-supported-i-was
+        return torch.tensor(data = list(map(lambda label: get_tempo_index(tempo = label), labels)), dtype = torch.uint8)
     
     # history of losses and accuracy
     history_columns = ("epoch", "train_loss", "train_accuracy", "validate_loss", "validate_accuracy", "freeze_pretrained")
@@ -203,7 +203,7 @@ if __name__ == "__main__":
         for inputs, labels in tqdm(data_loader["train"], desc = "Training"):
 
             # register inputs and labels with device
-            inputs, labels = inputs.to(device), labels_to_tempo_indicies(labels = labels).to(device)
+            inputs, labels = inputs.to(device), labels_to_tempo_indicies(labels = labels).view(-1).to(device) # https://stackoverflow.com/questions/71399847/runtimeerror-0d-or-1d-target-tensor-expected-multi-target-not-supported-i-was
             
             # clear existing gradients
             optimizer.zero_grad()
@@ -224,12 +224,10 @@ if __name__ == "__main__":
             history_epoch["train_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
             # compute the accuracy
-            predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1).type(torch.uint8)
-            labels = labels.view(-1)
-            accuracy_batch = (predictions == labels)
+            predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1)
 
             # compute the total accuracy for the batch and add it to history_epoch["train_accuracy"]
-            history_epoch["train_accuracy"] += torch.sum(input = accuracy_batch).item()
+            history_epoch["train_accuracy"] += torch.sum(input = (predictions == labels)).item()
         
         # for calculating time statistics
         end_time_epoch = time()
@@ -250,11 +248,11 @@ if __name__ == "__main__":
 
             # validation loop
             error_validate = torch.tensor(data = [], dtype = torch.float32).to(device)
-            for inputs, labels in tqdm(data_loader["validate"], desc = "Validating"):
+            for inputs, raw_labels in tqdm(data_loader["validate"], desc = "Validating"):
 
                 # register inputs and labels with device
-                raw_labels = labels.to(device)
-                inputs, labels = inputs.to(device), labels_to_tempo_indicies(labels = labels).to(device)
+                raw_labels = raw_labels.view(-1).to(device)
+                inputs, labels = inputs.to(device), labels_to_tempo_indicies(labels = raw_labels).view(-1).to(device)
             
                 # forward pass: compute predictions on input data using the model
                 predictions = tempo_nn(inputs)
@@ -266,16 +264,14 @@ if __name__ == "__main__":
                 history_epoch["validate_loss"] += loss_batch.item() * inputs.size(0) # inputs.size(0) is the number of inputs in the current batch, assumes loss is an average over the batch
             
                 # compute the accuracy
-                predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1).type(torch.uint8)
-                labels = labels.view(-1)
-                accuracy_batch = (predictions == labels)
+                predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1)
 
                 # compute the total accuracy for the batch and add it to history_epoch["validate_accuracy"]
-                history_epoch["validate_accuracy"] += torch.sum(input = accuracy_batch).item()
+                history_epoch["validate_accuracy"] += torch.sum(input = (predictions == labels)).item()
 
                 # add accuracy to running count of all the errors in the validation dataset
-                predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32).to(device) # convert predicted indicies into actual predicted tempos
-                error_batch = torch.abs(input = predictions.view(-1) - raw_labels.view(-1)) # get absolute error
+                predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32).view(-1).to(device) # convert predicted indicies into actual predicted tempos
+                error_batch = torch.abs(input = predictions - raw_labels) # get absolute error
                 error_validate = torch.cat(tensors = (error_validate, error_batch), dim = 0) # append to error validate
 
         ##################################################
@@ -298,7 +294,7 @@ if __name__ == "__main__":
 
         # save current model if its validation accuracy is the best so far
         global best_accuracy
-        if history_epoch["validate_accuracy"] <= best_accuracy:
+        if history_epoch["validate_accuracy"] >= best_accuracy:
             best_accuracy = history_epoch["validate_accuracy"] # update best_accuracy
             checkpoint = {
                 "epoch": epoch,
@@ -324,20 +320,22 @@ if __name__ == "__main__":
 
     # helper function for training 
     def train_epochs(start, n): # start = epoch to start training on; n = number of epochs to train from there
+        
+        # print what section is being trained
+        if FREEZE_PRETRAINED:
+            print("Training final regression layer...")
+        elif not FREEZE_PRETRAINED:
+            print("Fine-tuning pretrained layers...")
+        else:
+            print("Training all layers...")
+
+        # epochs loop
         epochs_to_train = range(start, start + n)
         for epoch in epochs_to_train:
             print("----------------------------------------------------------------")
             print(f"EPOCH {epoch + 1} / {epochs_to_train.stop}")
             train_an_epoch(epoch = epoch)
         print("================================================================")
-
-    # print what section is being trained
-    if FREEZE_PRETRAINED:
-        print("Training final regression layer...")
-    elif not FREEZE_PRETRAINED:
-        print("Fine-tuning pretrained layers...")
-    else:
-        print("Training all layers...")
     
     # train epochs
     train_epochs(start = start_epoch, n = EPOCHS)
