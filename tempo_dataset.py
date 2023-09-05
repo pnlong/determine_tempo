@@ -165,9 +165,9 @@ def _mix_down_if_necessary(signal):
 # crop/pad if waveform is too long/short
 def _edit_duration_if_necessary(signal, sample_rate, target_duration):
     n = int(target_duration * sample_rate) # n = desired signal length in # of samples; convert from seconds to # of samples
-    if signal.shape[1] > n: # crop if too long
+    if signal.size(1) > n: # crop if too long
         signal = signal[:, :n]
-    elif signal.shape[1] < n: # zero pad if too short
+    elif signal.size(1) < n: # zero pad if too short
         last_dim_padding = (0, n - signal.shape[1])
         signal = torch.nn.functional.pad(signal, pad = last_dim_padding, value = 0)
     return signal

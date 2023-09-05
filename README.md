@@ -10,7 +10,7 @@ DJs need to know the tempo of a song, typically measured in Beats Per Minute (BP
 
 ## Data
 
-I will use my personal song library (>2000 songs) to train this neural network, excluding classical and other genres of music that tend to have variable tempos. I will create a data table that contains information on each song's BPM, as well as their key for later use. This will probably involve creating a webscraper that takes an .MP3 as input and uses the MP3's metadata to search a website like [MusicStax](https://https://musicstax.com/) for important song information. I will divide my data 70%-20%-10%: 70% training data, 20% cross validation data, and the remaining 10% for measuring actual performance metrics. I will use melspectrogram data for training my neural network -- a couple convolutional layers should be able to pick up on patterns in the mel spectrograms, such as drumbeats or basslines.
+I will use my personal song library (>2000 songs) to train this neural network, excluding classical and other genres of music that tend to have variable tempos. I will create a data table that contains information on each song's BPM, as well as their key for later use. This will probably involve creating a webscraper that takes an .MP3 as input and uses the MP3's metadata to search a website like [MusicStax](https://https://musicstax.com/) for important song information. I will divide my data 70%-20%-10%: 70% training data, 20% cross validation data, and the remaining 10% for measuring actual performance metrics. I will use 10-second long melspectrogram data for training my neural network -- a couple convolutional layers should be able to pick up on patterns in the mel spectrograms, such as drumbeats or basslines.
 
 
 ## Machine Learning
@@ -113,7 +113,24 @@ sbatch ./gunzip_tempo_data.sh
 
 ---
 
+### *determine_tempo.py*
+
+Given a song (**.mp3**), output its predicted tempo (in BPM).
+
+```
+python ./determine_tempo.py nn_filepath song_filepath
+```
+
+- `nn_filepath` is the absolute filepath to the **.pth** file for the tempo neural network trained in `tempo_neural_network.py`.
+- `song_filepath` is the absolute filepath to the song (**.mp3**) whose tempo will be predicted.
+
+
+---
+
+
 ## Results
+
+See the raw training and testing results in `train.out` and `test.out`.
 
 I first attempted to create my own neural network from scratch. Note that one of my "convolutional blocks" consists of a convolutional layer followed by a ReLU activation function and max-pooling. My network had the following layout:
 
