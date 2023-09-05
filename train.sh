@@ -17,7 +17,7 @@ echo "JOB ID: ${SLURM_JOBID}"
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
-output_prefix="${data}/tempo_nn.classification"
+output_prefix="${data}/tempo_nn"
 
 # command to replace filepaths in data file
 # sed "s+/Volumes/Seagate/artificial_dj_data+${data}+g" "${data}/tempo_data.tsv" > "${data}/tempo_data.cluster.tsv"

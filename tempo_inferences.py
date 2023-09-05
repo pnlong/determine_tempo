@@ -26,6 +26,8 @@ from tempo_neural_network import tempo_nn, BATCH_SIZE # import neural network cl
 ##################################################
 LABELS_FILEPATH = sys.argv[1]
 NN_FILEPATH = sys.argv[2]
+OUTPUT_FILEPATH = ".".join(NN_FILEPATH.split(".")[:-1]) + ".test.png"
+INCLUDE_CONFUSION_MATRIX = False # whether or not to calculate and display a confusion matrix
 ##################################################
 
 
@@ -38,7 +40,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Device: {device.upper()}")
 
 # load back the model
-tempo_nn = tempo_nn(nn_filepath = NN_FILEPATH, device = device).to(device)
+tempo_nn = tempo_nn().to(device)
+tempo_nn.load_state_dict(torch.load(NN_FILEPATH, map_location = device)["state_dict"])
 print("Imported neural network parameters.")
 
 # instantiate our dataset object and data loader
@@ -62,13 +65,14 @@ with torch.no_grad():
     tempo_nn.eval()
 
     # validation loop
-    tempos = range(TEMPO_RANGE[0], TEMPO_RANGE[1] + 1)
-    confusion_matrix = torch.zeros(len(tempos), len(tempos), dtype = torch.float32).to(device) # rows = actual, columns = prediction
+    if INCLUDE_CONFUSION_MATRIX:
+        tempos = range(TEMPO_RANGE[0], TEMPO_RANGE[1] + 1)
+        confusion_matrix = torch.zeros(len(tempos), len(tempos), dtype = torch.float32).to(device) # rows = actual, columns = prediction
     error = torch.tensor(data = [], dtype = torch.float32).to(device)
     for inputs, raw_labels in tqdm(data_loader, desc = "Making predictions"):
 
         # register inputs and labels with device
-        raw_labels = raw_labels.view(-1).to(device)
+        raw_labels = raw_labels.view(-1, 1).to(device)
         inputs, labels = inputs.to(device), labels_to_tempo_indicies(labels = raw_labels).view(-1).to(device)
 
         # forward pass: compute predictions on input data using the model
@@ -76,20 +80,23 @@ with torch.no_grad():
         predictions = torch.argmax(input = predictions, dim = 1, keepdim = True).view(-1) # convert to class indicies
 
         # add to confusion matrix
-        confusion_matrix += torch.tensor(data = [[sum(predicted_tempo_index == predictions[labels == actual_tempo_index]) for predicted_tempo_index in range(len(tempos))] for actual_tempo_index in range(len(tempos))], dtype = confusion_matrix.dtype).to(device)
+        if INCLUDE_CONFUSION_MATRIX:
+            confusion_matrix += torch.tensor(data = [[sum(predicted_tempo_index == predictions[labels == actual_tempo_index]) for predicted_tempo_index in range(len(tempos))] for actual_tempo_index in range(len(tempos))], dtype = confusion_matrix.dtype).to(device)
         
         # add error to running count of all the errors in the validation dataset
-        predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32).view(-1).to(device) # convert predicted indicies into actual predicted tempos
-        error_batch = torch.abs(input = predictions - raw_labels)
+        predictions = torch.tensor(data = list(map(lambda i: get_tempo(index = i), predictions)), dtype = torch.float32).view(-1, 1).to(device) # convert predicted indicies into actual predicted tempos
+        predictions = torch.cat(tensors = (predictions / 2, predictions, predictions * 2), dim = 1) # make predictions into three columns, left-to-right: tempo / 2, tempo, tempo * 2
+        error_batch = torch.min(input = torch.abs(input = predictions - raw_labels), dim = 1, keepdim = False)[0] # get absolute error
         error = torch.cat(tensors = (error, error_batch), dim = 0)
 
 print("----------------------------------------------------------------")
 
-# normalize confusion matrix
-normalized_confusion_matrix = {
-    "precision": confusion_matrix / torch.sum(input = confusion_matrix, axis = 0).view(1, -1),
-    "recall": confusion_matrix / torch.sum(input = confusion_matrix, axis = 1).view(-1, 1)
-}
+if INCLUDE_CONFUSION_MATRIX:
+    # normalize confusion matrix
+    normalized_confusion_matrix = {
+        "precision": confusion_matrix / torch.sum(input = confusion_matrix, axis = 0).view(1, -1),
+        "recall": confusion_matrix / torch.sum(input = confusion_matrix, axis = 1).view(-1, 1)
+    }
 
 ##################################################
 
@@ -113,7 +120,8 @@ print("----------------------------------------------------------------")
 # MAKE PLOTS
 ##################################################
 
-fig, axes = plt.subplot_mosaic(mosaic = [["confusion", "percentiles"], ["normalized", "percentiles"]], constrained_layout = True, figsize = (12, 8))
+mosaic = [["confusion", "percentiles"], ["normalized", "percentiles"]] if INCLUDE_CONFUSION_MATRIX else [["percentiles"]]
+fig, axes = plt.subplot_mosaic(mosaic = mosaic, constrained_layout = True, figsize = (12, 8))    
 fig.suptitle("Testing the Tempo Neural Network")
 
 ##################################################
@@ -122,26 +130,28 @@ fig.suptitle("Testing the Tempo Neural Network")
 # CONFUSION MATRICES
 ##################################################
 
-tick_labels_step = 10
+if INCLUDE_CONFUSION_MATRIX:
 
-# plot confusion matrix
-confusion_plot_temp = axes["confusion"].imshow(confusion_matrix, aspect = "auto", origin = "upper", cmap = "Blues")
-fig.colorbar(confusion_plot_temp, ax = axes["confusion"], label = "n", location = "right")
-axes["normalized"].set_xticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
-axes["confusion"].set_ylabel("Actual Tempos")
-axes["confusion"].set_yticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
-axes["confusion"].set_title("Confusion Matrix")
+    tick_labels_step = 10
 
-# plot normalized confusion matrix (either precision or recall)
-normalized_confusion_matrix_type = "precision"
-normalized_confusion_plot_temp = axes["normalized"].imshow(normalized_confusion_matrix[normalized_confusion_matrix_type], aspect = "auto", origin = "upper", cmap = "Reds")
-fig.colorbar(normalized_confusion_plot_temp, ax = axes["normalized"], label = "", location = "right")
-axes["normalized"].set_xticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
-axes["normalized"].set_xlabel("Predicted Tempos")
-axes["confusion"].sharex(other = axes["normalized"]) # share the x-axis labels
-axes["normalized"].set_ylabel("Actual Tempos")
-axes["normalized"].set_yticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
-axes["normalized"].set_title(normalized_confusion_matrix_type.title())
+    # plot confusion matrix
+    confusion_plot_temp = axes["confusion"].imshow(confusion_matrix, aspect = "auto", origin = "upper", cmap = "Blues")
+    fig.colorbar(confusion_plot_temp, ax = axes["confusion"], label = "n", location = "right")
+    axes["normalized"].set_xticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
+    axes["confusion"].set_ylabel("Actual Tempos")
+    axes["confusion"].set_yticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
+    axes["confusion"].set_title("Confusion Matrix")
+
+    # plot normalized confusion matrix (either precision or recall)
+    normalized_confusion_matrix_type = "precision"
+    normalized_confusion_plot_temp = axes["normalized"].imshow(normalized_confusion_matrix[normalized_confusion_matrix_type], aspect = "auto", origin = "upper", cmap = "Reds")
+    fig.colorbar(normalized_confusion_plot_temp, ax = axes["normalized"], label = "", location = "right")
+    axes["normalized"].set_xticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
+    axes["normalized"].set_xlabel("Predicted Tempos")
+    axes["confusion"].sharex(other = axes["normalized"]) # share the x-axis labels
+    axes["normalized"].set_ylabel("Actual Tempos")
+    axes["normalized"].set_yticks(ticks = range(0, len(tempos), tick_labels_step), labels = range(tempos.start, tempos.stop, tick_labels_step))
+    axes["normalized"].set_title(normalized_confusion_matrix_type.title())
 
 ##################################################
 
@@ -162,6 +172,7 @@ axes["percentiles"].grid()
 ##################################################
 
 print("Outputting plot...")
-fig.savefig(".".join(NN_FILEPATH.split(".")[:-1]) + ".test.png", dpi = 240) # save image
+fig.savefig(OUTPUT_FILEPATH, dpi = 240) # save image
+print(f"Plot saved to {OUTPUT_FILEPATH}.")
 
 ##################################################

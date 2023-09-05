@@ -14,7 +14,7 @@
 
 artificial_dj="/dfs7/adl/pnlong/artificial_dj"
 data="${artificial_dj}/data"
-output_prefix="${data}/tempo_nn.classification"
+output_prefix="${data}/tempo_nn"
 
 # module load conda (hpc3 help says not to load python + conda together)
 module load miniconda3/4.12.0
