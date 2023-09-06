@@ -1,5 +1,5 @@
 JOB ID: 23963647
-EPOCHS: default
+EPOCHS: 10
 FREEZE_PRETRAINED: True
 ----------------------------------------------------------------
 Device: CUDA
