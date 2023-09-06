@@ -146,6 +146,6 @@ if __name__ == "__main__":
     nn_filepath = sys.argv[1]
     tempo_determiner = tempo_determiner(nn_filepath = nn_filepath)
     predicted_tempo = tempo_determiner.determine_tempo(song_filepath = song_filepath)
-    print(f"Predicted tempo of {song_filepath}: {predicted_tempo:.0f} BPM.")
+    print(f"Predicted tempo of {song_filepath}: {predicted_tempo:.0f} BPM")
 
 ##################################################
